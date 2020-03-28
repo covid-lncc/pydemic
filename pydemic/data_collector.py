@@ -1,6 +1,8 @@
 """
 A module to get json data from COVID19py and translate them to pandas.DataFrame or csv files.
 """
+from pathlib import Path
+from typing import Union
 
 import attr
 from enum import Enum
@@ -25,10 +27,26 @@ class DataSource(Enum):
     CSBS = 2
 
 
+class ExportFormat(Enum):
+    """
+    Supported file format extensions to export COVID19Py wrapped data. Available options:
+
+    1. csv format;
+
+    2. xlsx format (Excel native spreadsheet);
+
+    3. JSON serialized data.
+    """
+
+    CSV = 1
+    EXCEL = 2
+    JSON = 3
+
+
 @attr.s(auto_attribs=True)
 class AvailableCountryData:
     """
-    Docs: TODO
+    This class is responsible to manage information about available country names and provinces.
     """
 
     all_data: dict = None
@@ -36,7 +54,7 @@ class AvailableCountryData:
     _source: str = None
 
     def __attrs_post_init__(self):
-        if not self._has_internet_connection():  # pragma: no cover
+        if not _has_internet_connection():  # pragma: no cover
             RuntimeError(
                 "Internet connection is unavailable. However, internet connection is required."
             )
@@ -52,10 +70,12 @@ class AvailableCountryData:
         self.all_data = covid19.getAll()
 
     @property
-    def get_dataframe_for_available_countries(self):
+    def get_dataframe_for_available_countries(self) -> pd.DataFrame:
         """
-        Docs: TODO
+        Get data that provides available country names. This way, we can check what data we can retrieve from COVID19Py.
+
         :return:
+            A DataFrame containing all available countries and provinces.
         """
         country_names = list()
         country_codes = list()
@@ -80,13 +100,45 @@ class AvailableCountryData:
 
         return df_available_countries
 
-    @staticmethod
-    def _has_internet_connection():
-        try:
-            # connect to the host -- tells us if the host is actually
-            # reachable
-            socket.create_connection(("www.google.com", 80))
-            return True
-        except OSError:
-            pass
-        return False
+    def export_available_countries_data_frame(
+        self, file_format: ExportFormat, file_name: Union[str, Path]
+    ) -> None:
+        """
+        Export data gathered from COVID19Py related to available countries in data base.
+
+        :param ExportFormat file_format:
+            The format to export.
+
+        :param str|Path file_name:
+            The file name to write exported data.
+
+        :return:
+        """
+        df_available_countries = self.get_dataframe_for_available_countries
+        if file_format == ExportFormat.CSV:
+            df_available_countries.to_csv(file_name)
+        elif file_format == ExportFormat.EXCEL:
+            df_available_countries.to_excel(file_name)
+        elif file_format == ExportFormat.JSON:
+            df_available_countries.to_json(file_name)
+        else:
+            ValueError("Unsupported file format to export data.")
+
+        return
+
+
+def _has_internet_connection() -> bool:
+    """
+    Convenient method to check if internet connection is available.
+
+    :return:
+        Internet connection status. If on, it return True. Otherwise, returns False.
+    """
+    try:
+        # connect to the host -- tells us if the host is actually
+        # reachable
+        socket.create_connection(("www.google.com", 80))
+        return True
+    except OSError:
+        pass
+    return False

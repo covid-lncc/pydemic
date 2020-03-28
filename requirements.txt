@@ -24,6 +24,7 @@ pre-commit
 # Tests
 pytest-cov
 pytest-xdist
+pytest-regressions
 codecov
 
 # API for COVID-19

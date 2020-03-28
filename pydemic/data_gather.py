@@ -31,8 +31,8 @@ class AvailableCountryData:
     """
 
     all_data: dict = None
-    _source: str = None
     data_source: DataSource = DataSource.JHU
+    _source: str = None
 
     def __attrs_post_init__(self):
         if self.data_source == DataSource.JHU:

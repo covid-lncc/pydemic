@@ -1,13 +1,26 @@
 import pytest
+from pytest import fixture
+
+# from pytest_regressions import data_regression
 
 from pydemic.data_gather import AvailableCountryData
 
 
-def test_available_countries():
+@fixture
+def available_countries():
     available_countries = AvailableCountryData()
-    df_available_countries = available_countries.get_dataframe_for_available_countries
+    return available_countries
 
+
+def test_available_countries(available_countries):
+    df_available_countries = available_countries.get_dataframe_for_available_countries
     assert df_available_countries.shape[0] == 249
+
+
+def test_data_regression_for_countries(available_countries, data_regression):
+    df_available_countries = available_countries.get_dataframe_for_available_countries
+    dict_available_countries = df_available_countries.to_dict()
+    data_regression.check(dict_available_countries)
 
 
 def test_invalid_data_source_for_available_countries():

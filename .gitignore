@@ -6,3 +6,4 @@ pydemic/__pycache__/
 ./docs/.templates/
 devenv/
 mypackage.egg-info/
+.env

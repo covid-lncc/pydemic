@@ -1,8 +1,6 @@
 import pytest
 from pytest import fixture
 
-# from pytest_regressions import data_regression
-
 from pydemic.data_gather import AvailableCountryData
 
 

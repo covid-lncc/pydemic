@@ -1,6 +1,6 @@
 # Pydemic: a package for disease spreading models
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: LGPL3](https://img.shields.io/badge/license-LGPL%20(%3E%3D%203)-blue)](https://opensource.org/licenses/LGPL-3.0)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Build Status](https://travis-ci.com/volpatto/blank-python-project.svg?branch=master)](https://travis-ci.com/volpatto/blank-python-project)
 ![](https://github.com/volpatto/blank-python-project/workflows/linux/badge.svg?branch=master)

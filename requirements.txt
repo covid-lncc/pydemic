@@ -28,6 +28,7 @@ pre-commit
 pytest-cov
 pytest-xdist
 pytest-regressions
+pytest-lazy-fixture
 codecov
 
 # API for COVID-19

@@ -1,6 +1,7 @@
 """
 A module to get json data from COVID19py and translate them to pandas.DataFrame or csv files.
 """
+import json
 import os
 from pathlib import Path
 from typing import Union
@@ -51,24 +52,30 @@ class AvailableCountryData:
     """
 
     all_data: dict = None
-    data_source: DataSource = DataSource.JHU
+    online_data_source: DataSource = DataSource.JHU
+    use_internet_connection: bool = True
     _source: str = None
 
     def __attrs_post_init__(self):
-        if not _has_internet_connection():  # pragma: no cover
+        if not _has_internet_connection() and self.use_internet_connection:  # pragma: no cover
             RuntimeError(
                 "Internet connection is unavailable. However, internet connection is required."
             )
+        if self.use_internet_connection:
+            if self.online_data_source == DataSource.JHU:
+                self._source = "jhu"
+            elif self.online_data_source == DataSource.CSBS:
+                self._source = "csbs"
+            else:
+                raise ValueError("Unavailable data source.")
 
-        if self.data_source == DataSource.JHU:
-            self._source = "jhu"
-        elif self.data_source == DataSource.CSBS:
-            self._source = "csbs"
+            covid19 = COVID19Py.COVID19(data_source=self._source)
+            self.all_data = covid19.getAll()
         else:
-            raise ValueError("Unavailable data source.")
-
-        covid19 = COVID19Py.COVID19(data_source=self._source)
-        self.all_data = covid19.getAll()
+            dirname = os.path.dirname(__file__)
+            filename = os.path.join(dirname, "../data/all_data.json")
+            with open(filename, "r") as fp:
+                self.all_data = json.load(fp)
 
     @property
     def get_dataframe_for_available_countries(self) -> pd.DataFrame:
@@ -174,10 +181,10 @@ class AvailableCountryData:
         return country_codes_list
 
 
-#
 # @attr.s(auto_attribs=True)
 # class CountryDataCollector:
-#     raise NotImplementedError("To be implemented.")
+#     country_name: str
+#     _country_code: str = None
 
 
 def _has_internet_connection() -> bool:  # pragma: no cover

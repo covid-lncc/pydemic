@@ -3,7 +3,6 @@
 [![License: LGPL3](https://img.shields.io/badge/license-LGPL%20(%3E%3D%203)-blue)](https://opensource.org/licenses/LGPL-3.0)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 ![](https://github.com/covid-lncc/pydemic/workflows/linux/badge.svg?branch=master)
-![](https://github.com/covid-lncc/pydemic/workflows/osx/badge.svg?branch=master)
 ![](https://github.com/covid-lncc/pydemic/workflows/windows/badge.svg?branch=master)
 
 ## What is it?

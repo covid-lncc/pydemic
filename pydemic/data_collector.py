@@ -217,6 +217,18 @@ class CountryDataCollector:
     def _find_country_code_from_name(
         df_available_countries: pd.DataFrame, country_name: str
     ) -> str:
+        """
+        Convenient method to extract a country code from a country name.
+
+        :param df_available_countries:
+            A DataFrame with all available countries and provinces.
+
+        :param country_name:
+            A country name to query.
+
+        :return:
+            Country code equivalent to the provided country name.
+        """
         df_selected_country = df_available_countries[df_available_countries.name == country_name]
         df_selected_country_code = df_selected_country.code
         df_selected_country_code = df_selected_country_code.drop_duplicates()

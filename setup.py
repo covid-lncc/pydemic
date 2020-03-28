@@ -18,7 +18,7 @@ URL = "https://github.com/covid-lncc/pydemic"
 EMAIL = "volpatto@lncc.br"
 AUTHOR = "Diego Volpatto"
 REQUIRES_PYTHON = ">=3.6.1"  # Put your required Python version
-VERSION = "0.1"  # Put the package version as a string (ex.: '1.0.0')
+VERSION = "0.1.0"  # Put the package version as a string (ex.: '1.0.0')
 
 # What packages are required for this module to be executed?
 with open("requirements.txt") as f:

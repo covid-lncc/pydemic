@@ -1,6 +1,7 @@
 # Python
 attrs
 ipython
+twine
 
 # Scientific stack
 numpy>=1.18.2

@@ -5,6 +5,8 @@ ipython
 numpy>=1.18.2
 pytest>=5.4.1
 scipy>=1.4.1
+pandas>1.0
+openpyxl>3.0
 notebook>6
 nbextensions
 

@@ -2,6 +2,7 @@
 attrs
 ipython
 twine
+numba
 
 # Scientific stack
 numpy>=1.18.2
@@ -9,11 +10,13 @@ pytest>=5.4.1
 scipy>=1.4.1
 pandas>1.0
 openpyxl>3.0
+pygmo
+
+# Notebooks
 jupyter
 notebook>6
-pygmo
 nbextensions
-numba
+jupytext
 
 # Plotting
 matplotlib

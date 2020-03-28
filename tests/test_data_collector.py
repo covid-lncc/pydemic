@@ -1,7 +1,7 @@
 import pytest
 from pytest import fixture
 
-from pydemic.data_gather import AvailableCountryData
+from pydemic.data_collector import AvailableCountryData
 
 
 @fixture

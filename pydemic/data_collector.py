@@ -4,6 +4,7 @@ A module to get json data from COVID19py and translate them to pandas.DataFrame 
 
 import attr
 from enum import Enum
+import socket
 
 import COVID19Py
 import pandas as pd
@@ -35,6 +36,11 @@ class AvailableCountryData:
     _source: str = None
 
     def __attrs_post_init__(self):
+        if not self._has_internet_connection():  # pragma: no cover
+            RuntimeError(
+                "Internet connection is unavailable. However, internet connection is required."
+            )
+
         if self.data_source == DataSource.JHU:
             self._source = "jhu"
         elif self.data_source == DataSource.CSBS:
@@ -73,3 +79,14 @@ class AvailableCountryData:
         df_available_countries = pd.DataFrame(country_database_dict)
 
         return df_available_countries
+
+    @staticmethod
+    def _has_internet_connection():
+        try:
+            # connect to the host -- tells us if the host is actually
+            # reachable
+            socket.create_connection(("www.google.com", 80))
+            return True
+        except OSError:
+            pass
+        return False

@@ -21,6 +21,28 @@ def test_data_regression_for_countries(available_countries, data_regression):
     data_regression.check(dict_available_countries)
 
 
+def test_available_countries_names_to_list(available_countries):
+    list_available_countries_online = available_countries.list_of_available_country_names()
+    list_available_countries_offline = available_countries.list_of_available_country_names(
+        has_internet_connect=False
+    )
+
+    assert type(list_available_countries_online) is list
+    assert type(list_available_countries_offline) is list
+    assert len(list_available_countries_online) == len(list_available_countries_offline)
+
+
+def test_available_countries_codes_to_list(available_countries):
+    list_available_country_codes_online = available_countries.list_of_available_country_codes()
+    list_available_country_codes_offline = available_countries.list_of_available_country_codes(
+        has_internet_connect=False
+    )
+
+    assert type(list_available_country_codes_online) is list
+    assert type(list_available_country_codes_offline) is list
+    assert len(list_available_country_codes_offline) == len(list_available_country_codes_offline)
+
+
 def test_invalid_data_source_for_available_countries():
     invalid_data_source = "WHO"
     with pytest.raises(ValueError, match="Unavailable data source."):

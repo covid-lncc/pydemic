@@ -8,3 +8,5 @@ devenv/
 mypackage.egg-info/
 .env
 dist
+
+*.csv#

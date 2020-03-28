@@ -1,14 +1,16 @@
 import pytest
-import numpy as np
 
-import pydemic.data_gather
+from pydemic.data_gather import AvailableCountryData
 
 
-@pytest.mark.parametrize("dim", [3, 4, 5])
-def test_a_function(dim):
+def test_available_countries():
+    available_countries = AvailableCountryData()
+    df_available_countries = available_countries.get_dataframe_for_available_countries
 
-    output = pydemic.data_gather.a_function(x=0.0, dim=dim)
+    assert df_available_countries.shape[0] == 249
 
-    pass_conditions = output == pytest.approx(np.ones(dim))
-    if not pass_conditions:
-        raise AssertionError()
+
+def test_invalid_data_source_for_available_countries():
+    invalid_data_source = "WHO"
+    with pytest.raises(ValueError, match="Unavailable data source."):
+        AvailableCountryData(data_source=invalid_data_source)

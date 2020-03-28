@@ -13,6 +13,41 @@
 
 A package to model disease spreading with SIR/SEIR-based models. We are currently in a very early development stage.
 
+## Development mode
+
+In order to develop and use `pydemic`, you have to execute the following steps:
+
+1. Install `python > 3.6`.
+
+2. Install `virtualenv`:
+    ```console
+    $ pip install virtualenv
+    ```
+
+3. Create your isolated environment (here named as `.env`):
+    ```console
+    $ virtualenv .env
+    ```
+
+4. Activate the environment:
+    ```console
+    $ source .env/bin/activate
+    ```
+
+5. Install all required dependencies:
+    ```console
+    $ pip install -r requirements.txt
+    ```
+
+6. Setup the checkers and formatters:
+    ```console
+    $ pre-commit install
+    ```
+
+Now you can properly use `pydemic`. The steps 1-3 and 6 are necessary only in the first time
+that you configured to develop `pydemic`. Step 5 is needed when new dependencies
+are added.
+
 ## Contact
 
 My name is Diego. Feel free to contact me through the email <volpatto@lncc.br>.

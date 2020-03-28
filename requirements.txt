@@ -1,3 +1,6 @@
+# Python
+ipython
+
 # Scientific stack
 numpy>=1.18.2
 pytest>=5.4.1
@@ -10,6 +13,7 @@ pre-commit
 
 # Tests
 pytest-cov
+pytest-xdist
 codecov
 
 # API for COVID-19

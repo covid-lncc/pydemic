@@ -1,10 +1,9 @@
 [run]
 branch = True
-source = blank-python-project
+source = pydemic
 
 omit =
     tests/*
-    notebooks/*
 
 [report]
 exclude_lines =

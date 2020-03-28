@@ -126,17 +126,17 @@ class AvailableCountryData:
 
         return
 
-    def list_of_available_country_names(self, has_internet_connect: bool = True) -> list:
+    def list_of_available_country_names(self, has_internet_connection: bool = True) -> list:
         """
         A list with all country names.
 
-        :param has_internet_connect:
-            Set true if you have internet connection. Otherwise set it as False.
+        :param has_internet_connection:
+            Set as True if you have internet connection. Otherwise set it as False.
 
         :return:
             The list with all available country names from database.
         """
-        if has_internet_connect:
+        if has_internet_connection:
             df_country_data = self.get_dataframe_for_available_countries.copy()
             df_country_data = df_country_data["name"].drop_duplicates()
             country_names_list = list(df_country_data.values)
@@ -147,17 +147,17 @@ class AvailableCountryData:
 
         return country_names_list
 
-    def list_of_available_country_codes(self, has_internet_connect: bool = True) -> list:
+    def list_of_available_country_codes(self, has_internet_connection: bool = True) -> list:
         """
         A list with all country codes.
 
-        :param has_internet_connect:
-            Set true if you have internet connection. Otherwise set it as False.
+        :param has_internet_connection:
+            Set as True if you have internet connection. Otherwise set it as False.
 
         :return:
             The list with all available country codes from database.
         """
-        if has_internet_connect:
+        if has_internet_connection:
             df_country_data = self.get_dataframe_for_available_countries.copy()
             df_country_data = df_country_data["code"].drop_duplicates()
             country_codes_list = list(df_country_data.values)

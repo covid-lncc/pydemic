@@ -24,7 +24,7 @@ def test_data_regression_for_countries(available_countries, data_regression):
 def test_available_countries_names_to_list(available_countries):
     list_available_countries_online = available_countries.list_of_available_country_names()
     list_available_countries_offline = available_countries.list_of_available_country_names(
-        has_internet_connect=False
+        has_internet_connection=False
     )
 
     assert type(list_available_countries_online) is list
@@ -35,7 +35,7 @@ def test_available_countries_names_to_list(available_countries):
 def test_available_countries_codes_to_list(available_countries):
     list_available_country_codes_online = available_countries.list_of_available_country_codes()
     list_available_country_codes_offline = available_countries.list_of_available_country_codes(
-        has_internet_connect=False
+        has_internet_connection=False
     )
 
     assert type(list_available_country_codes_online) is list

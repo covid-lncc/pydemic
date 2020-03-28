@@ -12,16 +12,17 @@ from shutil import rmtree
 from setuptools import find_packages, setup, Command
 
 # Package meta-data.
-NAME = "mypackage"
-DESCRIPTION = "A short description"
-URL = "https://github.com//me/myproject"
-EMAIL = "your.email@somewhere.com"
-AUTHOR = "Your name"
+NAME = "pydemic"
+DESCRIPTION = "A python package for epidemic spreading"
+URL = "https://github.com/covid-lncc/pydemic"
+EMAIL = "volpatto@lncc.br"
+AUTHOR = "Diego Volpatto"
 REQUIRES_PYTHON = ">=3.6.1"  # Put your required Python version
 VERSION = "0.1"  # Put the package version as a string (ex.: '1.0.0')
 
 # What packages are required for this module to be executed?
-REQUIRED = ["numpy", "pytest", "numpydoc"]
+with open("requirements.txt") as f:
+    REQUIRED = f.read().splitlines()
 
 # What packages are optional?
 EXTRAS = {
@@ -102,22 +103,24 @@ setup(
     url=URL,
     packages=find_packages(exclude=("tests",)),
     # If your package is a single module, use this instead of 'packages':
-    # py_modules=['mypackage'],
+    # py_modules=['pydemic'],
     # entry_points={
     #     'console_scripts': ['mycli=mymodule:cli'],
     # },
     install_requires=REQUIRED,
     extras_require=EXTRAS,
     include_package_data=True,
-    license="MIT",
-    classifiers=[
+    license="LGPLv3",
+    classifiers={
         # Trove classifiers
         # Full list: https://pypi.python.org/pypi?%3Aaction=list_classifiers
-        "License :: OSI Approved :: MIT License",
+        "License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)",
         "Development Status :: 1 - Planning",
         "Programming Language :: Python :: 3 :: Only",
-        "Programming Language :: Python :: 3.6",
-    ],
+        "Topic :: Scientific/Engineering",
+        "Topic :: Scientific/Engineering :: Mathematics",
+        "Topic :: Scientific/Engineering :: Epidemiology",
+    },
     # $ setup.py publish support.
     cmdclass={"upload": UploadCommand,},
 )

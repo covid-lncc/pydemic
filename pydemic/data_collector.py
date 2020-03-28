@@ -127,7 +127,7 @@ class AvailableCountryData:
         return
 
 
-def _has_internet_connection() -> bool:
+def _has_internet_connection() -> bool:  # pragma: no cover
     """
     Convenient method to check if internet connection is available.
 

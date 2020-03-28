@@ -7,3 +7,4 @@ pydemic/__pycache__/
 devenv/
 mypackage.egg-info/
 .env
+dist

@@ -11,6 +11,7 @@ openpyxl>3.0
 notebook>6
 pygmo
 nbextensions
+numba
 
 # Plotting
 matplotlib

@@ -1,6 +1,7 @@
 """
 A module to get json data from COVID19py and translate them to pandas.DataFrame or csv files.
 """
+import os
 from pathlib import Path
 from typing import Union
 
@@ -141,7 +142,9 @@ class AvailableCountryData:
             df_country_data = df_country_data["name"].drop_duplicates()
             country_names_list = list(df_country_data.values)
         else:
-            df_country_data = pd.read_csv("../data/available_countries.csv")
+            dirname = os.path.dirname(__file__)
+            filename = os.path.join(dirname, "../data/available_countries.csv")
+            df_country_data = pd.read_csv(filename)
             df_country_data = df_country_data["name"].drop_duplicates()
             country_names_list = list(df_country_data.values)
 
@@ -162,11 +165,19 @@ class AvailableCountryData:
             df_country_data = df_country_data["code"].drop_duplicates()
             country_codes_list = list(df_country_data.values)
         else:
-            df_country_data = pd.read_csv("../data/available_countries.csv")
+            dirname = os.path.dirname(__file__)
+            filename = os.path.join(dirname, "../data/available_countries.csv")
+            df_country_data = pd.read_csv(filename)
             df_country_data = df_country_data["code"].drop_duplicates()
             country_codes_list = list(df_country_data.values)
 
         return country_codes_list
+
+
+#
+# @attr.s(auto_attribs=True)
+# class CountryDataCollector:
+#     raise NotImplementedError("To be implemented.")
 
 
 def _has_internet_connection() -> bool:  # pragma: no cover

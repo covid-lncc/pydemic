@@ -1,7 +1,7 @@
 import pytest
 from pytest import fixture
 
-from pydemic.data_collector import AvailableCountryData, ExportFormat
+from pydemic.data_collector import AvailableCountryData, ExportFormat, CountryDataCollector
 
 
 @fixture
@@ -109,3 +109,16 @@ def test_available_countries_exporter(tmp_path, available_countries):
     )
 
     assert len(list(tmp_path.iterdir())) == 3
+
+
+def test_unavailable_country_name_in_data_collector():
+    with pytest.raises(ValueError, match="Queried country name is not available."):
+        CountryDataCollector("Brasil")
+
+
+def test_country_code_getter():
+    brazil_data = CountryDataCollector("Brazil")
+    assert brazil_data.country_code == "BR"
+
+    us_data = CountryDataCollector("US")
+    assert us_data.country_code == "US"

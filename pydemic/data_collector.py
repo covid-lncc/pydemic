@@ -136,7 +136,7 @@ class AvailableCountryData:
 
     def list_of_available_country_names(self, has_internet_connection: bool = True) -> list:
         """
-        A list with all country names.
+        A list with all available country names.
 
         :param has_internet_connection:
             Set as True if you have internet connection. Otherwise set it as False.
@@ -181,10 +181,51 @@ class AvailableCountryData:
         return country_codes_list
 
 
-# @attr.s(auto_attribs=True)
-# class CountryDataCollector:
-#     country_name: str
-#     _country_code: str = None
+@attr.s(auto_attribs=True)
+class CountryDataCollector:
+    country_name: str
+    use_online_resources: bool = False
+    online_data_source: DataSource = None
+    _country_code: str = None
+
+    def __attrs_post_init__(self):
+        if self.use_online_resources:
+            if self.online_data_source is None:
+                raise ValueError(
+                    "The online data source must be specified in order to use online resources."
+                )
+
+        if not type(self.country_name) is str:
+            raise ValueError("Country name must be specified as a string.")
+
+        trial_country_name = self.country_name
+        if self.use_online_resources:
+            available_countries = AvailableCountryData()
+        else:
+            available_countries = AvailableCountryData(use_internet_connection=False)
+
+        list_available_countries = available_countries.list_of_available_country_names()
+        if trial_country_name not in list_available_countries:
+            raise ValueError("Queried country name is not available.")
+
+        df_available_countries = available_countries.get_dataframe_for_available_countries
+        self._country_code = self._find_country_code_from_name(
+            df_available_countries, trial_country_name
+        )
+
+    @staticmethod
+    def _find_country_code_from_name(
+        df_available_countries: pd.DataFrame, country_name: str
+    ) -> str:
+        df_selected_country = df_available_countries[df_available_countries.name == country_name]
+        df_selected_country_code = df_selected_country.code
+        df_selected_country_code = df_selected_country_code.drop_duplicates()
+        country_code = str(df_selected_country_code.values[0])
+        return country_code
+
+    @property
+    def country_code(self):
+        return self._country_code
 
 
 def _has_internet_connection() -> bool:  # pragma: no cover

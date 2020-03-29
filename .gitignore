@@ -5,8 +5,9 @@ pydemic/__pycache__/
 ./docs/.static/
 ./docs/.templates/
 devenv/
-mypackage.egg-info/
+*.egg-info/
 .env
 dist
+build
 
 *.csv#

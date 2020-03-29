@@ -1,1 +1,3 @@
-README.md
+include README.md
+include data/*.csv
+include data/*.json

@@ -27,6 +27,16 @@ def install(c):
 
 
 @task
+def hooks(c):
+    c.run("pre-commit install")
+
+
+@task
+def formatters(c):
+    c.run("pre-commit run")
+
+
+@task
 def sdist(c):
     c.run("python setup.py sdist")
 

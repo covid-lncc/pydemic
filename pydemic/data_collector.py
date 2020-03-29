@@ -50,11 +50,17 @@ class ExportFormat(Enum):
 class AvailableCountryData:
     """
     This class is responsible to manage information about available country names and provinces.
+
+    Attributes:
+    ------------
+    * online_data_source: The online database form COVID19Py API to be used.
+
+    * use_internet_connection: Set True if you want to download new data from COVID19Py API.
     """
 
-    all_data: dict = None
     online_data_source: DataSource = DataSource.JHU
     use_internet_connection: bool = True
+    _all_data: dict = None
     _source: str = None
 
     def __attrs_post_init__(self):
@@ -66,11 +72,11 @@ class AvailableCountryData:
             self._source = _get_online_resource_as_str(self.online_data_source)
 
             covid19 = COVID19Py.COVID19(data_source=self._source)
-            self.all_data = covid19.getAll()
+            self._all_data = covid19.getAll()
         else:
             filename = _get_absolute_path_relative_to_script("../data/all_data.json")
             with open(filename, "r") as fp:
-                self.all_data = json.load(fp)
+                self._all_data = json.load(fp)
 
     @property
     def get_dataframe_for_available_countries(self) -> pd.DataFrame:
@@ -83,7 +89,7 @@ class AvailableCountryData:
         country_names = list()
         country_codes = list()
         country_provinces = list()
-        progress_bar = tqdm(self.all_data["locations"])
+        progress_bar = tqdm(self._all_data["locations"])
         for entry in progress_bar:
             progress_bar.set_description("Processing available countries DataFrame")
             country_name = entry["country"]
@@ -178,6 +184,19 @@ class AvailableCountryData:
 
 @attr.s(auto_attribs=True)
 class CountryDataCollector:
+    """
+    Class that provides information about COVID-19 scenario for a given country.
+
+    Attributes:
+    ------------
+
+    * country_name: The name of the Country.
+
+    * use_online_resources: A bool variable to turn on the use of online resources from COVID19Py.
+
+    * online_data_source: Set which online resources from COVID19Py to use.
+    """
+
     country_name: str
     use_online_resources: bool = False
     online_data_source: DataSource = DataSource.JHU
@@ -231,11 +250,24 @@ class CountryDataCollector:
         return country_code
 
     @property
-    def country_code(self):
+    def country_code(self) -> str:
+        """
+        Country code for the provided country name.
+
+        :return:
+            Country code.
+        """
         return self._country_code
 
     @property
     def get_time_series_data_frame(self) -> pd.DataFrame:
+        """
+        Provide a DataFrame filled with country data, including: date, confirmed cases
+        and deaths.
+
+        :return:
+            DataFrame with information for queried country.
+        """
         if self.use_online_resources:
             online_resource = _get_online_resource_as_str(self.online_data_source)
             covid19 = COVID19Py.COVID19(data_source=online_resource)
@@ -283,7 +315,16 @@ class CountryDataCollector:
                     .reset_index()
                 )
         else:
-            filename = _get_absolute_path_relative_to_script("../data/available_countries.csv")
+            filename = _get_absolute_path_relative_to_script("../data/full_dataset_jhu.csv")
+            df_full_dataset_jhu = pd.read_csv(filename)
+            df_grouped_country = df_full_dataset_jhu[
+                df_full_dataset_jhu["country"] == self.country_name
+            ].reset_index()
+            df_country_data = (
+                df_grouped_country.groupby("date")["date", "confirmed", "deaths"]
+                .sum()
+                .reset_index()
+            )
 
         return df_country_data
 

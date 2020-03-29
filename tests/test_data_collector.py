@@ -23,6 +23,12 @@ def brazil_data():
 
 
 @fixture
+def brazil_data_offline():
+    brazil_data = CountryDataCollector("Brazil", use_online_resources=False)
+    return brazil_data
+
+
+@fixture
 def us_data():
     us_data = CountryDataCollector("US")
     return us_data
@@ -31,6 +37,12 @@ def us_data():
 @fixture
 def china_data():
     china_data = CountryDataCollector("China", use_online_resources=True)
+    return china_data
+
+
+@fixture
+def china_data_offline():
+    china_data = CountryDataCollector("China", use_online_resources=False)
     return china_data
 
 
@@ -127,7 +139,19 @@ def test_data_frame_for_brazil(brazil_data):
     assert df_brazil_data.shape[1] > 1
 
 
+def test_data_frame_for_brazil_offline(brazil_data_offline):
+    df_brazil_data = brazil_data_offline.get_time_series_data_frame
+    assert df_brazil_data.shape[0] > 1
+    assert df_brazil_data.shape[1] > 1
+
+
 def test_data_frame_for_china(china_data):
     df_china_data = china_data.get_time_series_data_frame
+    assert df_china_data.shape[0] > 1
+    assert df_china_data.shape[1] > 1
+
+
+def test_data_frame_for_china_offline(china_data_offline):
+    df_china_data = china_data_offline.get_time_series_data_frame
     assert df_china_data.shape[0] > 1
     assert df_china_data.shape[1] > 1

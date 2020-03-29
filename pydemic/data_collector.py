@@ -74,7 +74,7 @@ class AvailableCountryData:
             covid19 = COVID19Py.COVID19(data_source=self._source)
             self._all_data = covid19.getAll()
         else:
-            filename = _get_absolute_path_relative_to_script("../data/all_data.json")
+            filename = _get_absolute_path_relative_to_script("data/all_data.json")
             with open(filename, "r") as fp:
                 self._all_data = json.load(fp)
 
@@ -152,7 +152,7 @@ class AvailableCountryData:
             df_country_data = df_country_data["name"].drop_duplicates()
             country_names_list = list(df_country_data.values)
         else:
-            filename = _get_absolute_path_relative_to_script("../data/available_countries.csv")
+            filename = _get_absolute_path_relative_to_script("data/available_countries.csv")
             df_country_data = pd.read_csv(filename)
             df_country_data = df_country_data["name"].drop_duplicates()
             country_names_list = list(df_country_data.values)
@@ -174,7 +174,7 @@ class AvailableCountryData:
             df_country_data = df_country_data["code"].drop_duplicates()
             country_codes_list = list(df_country_data.values)
         else:
-            filename = _get_absolute_path_relative_to_script("../data/available_countries.csv")
+            filename = _get_absolute_path_relative_to_script("data/available_countries.csv")
             df_country_data = pd.read_csv(filename)
             df_country_data = df_country_data["code"].drop_duplicates()
             country_codes_list = list(df_country_data.values)
@@ -278,7 +278,7 @@ class CountryDataCollector:
                 amount_of_days = len(location["timelines"]["confirmed"]["timeline"])
                 days_range_list = list(range(amount_of_days))
                 data_confirmed_and_deaths_dict = {
-                    "day": days_range_list,
+                    # "day": days_range_list,
                     "date": list(location["timelines"]["confirmed"]["timeline"].keys()),
                     "confirmed": list(location["timelines"]["confirmed"]["timeline"].values()),
                     "deaths": list(location["timelines"]["deaths"]["timeline"].values()),
@@ -294,7 +294,7 @@ class CountryDataCollector:
                     days_range_list = list(range(amount_of_days))
                     data_confirmed_and_deaths_province_dict = {
                         "province": str(province_data["province"]),
-                        "day": days_range_list,
+                        # "day": days_range_list,
                         "date": list(province_data["timelines"]["confirmed"]["timeline"].keys()),
                         "confirmed": list(
                             province_data["timelines"]["confirmed"]["timeline"].values()
@@ -315,7 +315,7 @@ class CountryDataCollector:
                     .reset_index()
                 )
         else:
-            filename = _get_absolute_path_relative_to_script("../data/full_dataset_jhu.csv")
+            filename = _get_absolute_path_relative_to_script("data/full_dataset_jhu.csv")
             df_full_dataset_jhu = pd.read_csv(filename)
             df_grouped_country = df_full_dataset_jhu[
                 df_full_dataset_jhu["country"] == self.country_name

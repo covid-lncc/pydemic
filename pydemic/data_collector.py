@@ -12,6 +12,7 @@ import socket
 
 import COVID19Py
 import pandas as pd
+from tqdm import tqdm
 
 
 class DataSource(Enum):
@@ -88,7 +89,7 @@ class AvailableCountryData:
         country_names = list()
         country_codes = list()
         country_provinces = list()
-        for entry in self.all_data["locations"]:
+        for entry in tqdm(self.all_data["locations"]):
             country_name = entry["country"]
             country_names.append(country_name)
 
@@ -259,7 +260,9 @@ class CountryDataCollector:
                 df_country_data.date = df_country_data.date.astype("datetime64[ns]")
             else:
                 list_of_df_province_data = list()
-                for province_data in location_dict:
+                progress_bar = tqdm(location_dict)
+                for province_data in progress_bar:
+                    progress_bar.set_description(f"Processing country {self.country_name}")
                     amount_of_days = len(province_data["timelines"]["confirmed"]["timeline"])
                     days_range_list = list(range(amount_of_days))
                     data_confirmed_and_deaths_province_dict = {

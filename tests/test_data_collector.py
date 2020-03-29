@@ -25,18 +25,11 @@ def available_countries_offline():
 )
 def test_available_countries(available_countries):
     df_available_countries = available_countries.get_dataframe_for_available_countries
-    assert df_available_countries.shape[0] == 249
+    assert df_available_countries.shape[0] >= 249
 
 
-@pytest.mark.parametrize(
-    "available_countries",
-    [
-        pytest.lazy_fixture("available_countries_online"),
-        pytest.lazy_fixture("available_countries_offline"),
-    ],
-)
-def test_data_regression_for_countries(available_countries, data_regression):
-    df_available_countries = available_countries.get_dataframe_for_available_countries
+def test_data_regression_for_countries(available_countries_offline, data_regression):
+    df_available_countries = available_countries_offline.get_dataframe_for_available_countries
     dict_available_countries = df_available_countries.to_dict()
     data_regression.check(dict_available_countries)
 
@@ -52,17 +45,6 @@ def test_available_countries_names_to_list(available_countries):
     list_available_countries = available_countries.list_of_available_country_names()
 
     assert type(list_available_countries) is list
-
-
-def test_available_countries_equivalence_online_offline(
-    available_countries_online, available_countries_offline
-):
-    list_available_countries_online = available_countries_online.list_of_available_country_names()
-    list_available_countries_offline = available_countries_offline.list_of_available_country_names(
-        has_internet_connection=False
-    )
-
-    assert len(list_available_countries_online) == len(list_available_countries_offline)
 
 
 @pytest.mark.parametrize(

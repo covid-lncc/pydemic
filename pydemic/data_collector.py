@@ -239,6 +239,56 @@ class CountryDataCollector:
     def country_code(self):
         return self._country_code
 
+    @property
+    def get_time_series_data_frame(self) -> pd.DataFrame:
+        if self.use_online_resources:
+            covid19 = COVID19Py.COVID19(data_source=self.online_data_source)
+            code = self._country_code
+            location_dict = covid19.getLocationByCountryCode(code, timelines=True)
+            if len(location_dict) == 1:
+                location = location_dict[0]
+                amount_of_days = len(location["timelines"]["confirmed"]["timeline"])
+                days_range_list = list(range(amount_of_days))
+                data_confirmed_and_deaths_dict = {
+                    "day": days_range_list,
+                    "date": list(location["timelines"]["confirmed"]["timeline"].keys()),
+                    "confirmed": location["timelines"]["confirmed"]["timeline"].values,
+                    "deaths": location["timelines"]["confirmed"]["timeline"].values,
+                }
+                df_country_data = pd.DataFrame(data_confirmed_and_deaths_dict)
+                df_country_data.date = df_country_data.date.astype("datetime64[ns]")
+            else:
+                list_of_df_province_data = list()
+                for province_data in location_dict:
+                    amount_of_days = len(province_data["timelines"]["confirmed"]["timeline"])
+                    days_range_list = list(range(amount_of_days))
+                    data_confirmed_and_deaths_province_dict = {
+                        "province": str(province_data["province"]),
+                        "day": days_range_list,
+                        "date": list(province_data["timelines"]["confirmed"]["timeline"].keys()),
+                        "confirmed": list(
+                            province_data["timelines"]["confirmed"]["timeline"].values()
+                        ),
+                        "deaths": list(province_data["timelines"]["deaths"]["timeline"].values()),
+                    }
+                    df_province_data = pd.DataFrame(data_confirmed_and_deaths_province_dict)
+                    df_province_data.date = df_province_data.date.astype("datetime64[ns]")
+                    list_of_df_province_data.append(df_province_data)
+
+                df_grouped_provinces = pd.concat(list_of_df_province_data, axis=0)
+                df_grouped_provinces_sorted = df_grouped_provinces.sort_values(
+                    by="province"
+                ).reset_index(drop=True)
+                df_country_data = (
+                    df_grouped_provinces_sorted.groupby("date")["date", "confirmed", "deaths"]
+                    .sum()
+                    .reset_index(drop=True)
+                )
+        else:
+            raise NotImplementedError("Offline database resources is not implemented yet.")
+
+        return df_country_data
+
 
 def _has_internet_connection() -> bool:  # pragma: no cover
     """

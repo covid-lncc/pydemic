@@ -24,6 +24,9 @@ matplotlib
 # Formatters and Checkers
 pre-commit
 
+# Progress bar
+tqdm
+
 # Tests
 pytest-cov
 pytest-xdist

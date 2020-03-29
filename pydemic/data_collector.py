@@ -278,7 +278,6 @@ class CountryDataCollector:
                 amount_of_days = len(location["timelines"]["confirmed"]["timeline"])
                 days_range_list = list(range(amount_of_days))
                 data_confirmed_and_deaths_dict = {
-                    # "day": days_range_list,
                     "date": list(location["timelines"]["confirmed"]["timeline"].keys()),
                     "confirmed": list(location["timelines"]["confirmed"]["timeline"].values()),
                     "deaths": list(location["timelines"]["deaths"]["timeline"].values()),
@@ -294,7 +293,6 @@ class CountryDataCollector:
                     days_range_list = list(range(amount_of_days))
                     data_confirmed_and_deaths_province_dict = {
                         "province": str(province_data["province"]),
-                        # "day": days_range_list,
                         "date": list(province_data["timelines"]["confirmed"]["timeline"].keys()),
                         "confirmed": list(
                             province_data["timelines"]["confirmed"]["timeline"].values()

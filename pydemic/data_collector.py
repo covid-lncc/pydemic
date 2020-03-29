@@ -126,15 +126,7 @@ class AvailableCountryData:
         :return:
         """
         df_available_countries = self.get_dataframe_for_available_countries
-        if file_format == ExportFormat.CSV:
-            df_available_countries.to_csv(file_name)
-        elif file_format == ExportFormat.EXCEL:
-            df_available_countries.to_excel(file_name)
-        elif file_format == ExportFormat.JSON:
-            df_available_countries.to_json(file_name)
-        else:
-            ValueError("Unsupported file format to export data.")
-
+        _export_data_frame_to_file(file_name, df_available_countries, file_format)
         return
 
     def list_of_available_country_names(self, has_internet_connection: bool = True) -> list:
@@ -376,3 +368,95 @@ def _get_absolute_path_relative_to_script(target_relative_path: Union[str, Path]
     dirname = os.path.dirname(__file__)
     filename_absolute = os.path.join(dirname, target_relative_path)
     return filename_absolute
+
+
+def get_updated_full_dataset_from_jhu() -> pd.DataFrame:
+    """
+    Convenient function to generate a full and up-to-date pandas.DataFrame with data from JHU.
+
+    :return:
+        A pandas.DataFrame with up-to-date data.
+    """
+    covid19 = COVID19Py.COVID19(data_source="jhu")
+    available_countries = AvailableCountryData(use_internet_connection=True)
+    list_of_available_countries_codes = available_countries.list_of_available_country_codes()
+
+    list_of_df = list()
+    progress_bar = tqdm(list_of_available_countries_codes)
+    for country_code in progress_bar:
+        progress_bar.set_description(f"Processing country code {country_code}")
+        location = covid19.getLocationByCountryCode(country_code, timelines=True)
+        for province_data in location:
+            amount_of_days = len(province_data["timelines"]["confirmed"]["timeline"])
+            days_range_list = list(range(amount_of_days))
+            data_confirmed_and_deaths_province_dict = {
+                "country": str(province_data["country"]),
+                "province": str(province_data["province"]),
+                "day": days_range_list,
+                "date": list(province_data["timelines"]["confirmed"]["timeline"].keys()),
+                "confirmed": list(province_data["timelines"]["confirmed"]["timeline"].values()),
+                "deaths": list(province_data["timelines"]["deaths"]["timeline"].values()),
+            }
+            df_province_data = pd.DataFrame(data_confirmed_and_deaths_province_dict)
+            df_province_data.date = df_province_data.date.astype("datetime64[ns]")
+            list_of_df.append(df_province_data)
+
+    df_all_grouped = pd.concat(list_of_df, axis=0)
+    df_all_grouped_sorted = df_all_grouped.sort_values(by=["country", "day"]).reset_index(drop=True)
+
+    return df_all_grouped_sorted
+
+
+def export_updated_full_dataset_from_jhu(
+    export_to_file_format: ExportFormat = ExportFormat.CSV,
+) -> None:
+    """
+    Export a full and up-to-date file with data from JHU.
+
+    :param export_to_file_format:
+        File format to be exported. It can be ExportFormat.CSV, ExportFormat.EXCEL or ExportFormat.JSON.
+    """
+    df_all_grouped_sorted = get_updated_full_dataset_from_jhu()
+
+    if export_to_file_format is not None:
+        if export_to_file_format == ExportFormat.CSV:
+            _export_data_frame_to_file(
+                "full_dataset_jhu.csv", df_all_grouped_sorted, export_to_file_format
+            )
+        if export_to_file_format == ExportFormat.EXCEL:
+            _export_data_frame_to_file(
+                "full_dataset_jhu.xlsx", df_all_grouped_sorted, export_to_file_format
+            )
+        if export_to_file_format == ExportFormat.JSON:
+            _export_data_frame_to_file(
+                "full_dataset_jhu.json", df_all_grouped_sorted, export_to_file_format
+            )
+
+    return
+
+
+def _export_data_frame_to_file(
+    file_name: Union[str, Path], df: pd.DataFrame, file_format: ExportFormat = ExportFormat.CSV
+) -> None:
+    """
+    Helper function to export pandas.DataFrame.
+
+    :param file_name:
+        A file name or a path containing the extension at the end.
+
+    :param df:
+        A pandas.DataFrame.
+
+    :param file_format:
+        File format to export.
+    """
+    if file_format == ExportFormat.CSV:
+        df.to_csv(file_name)
+    elif file_format == ExportFormat.EXCEL:
+        df.to_excel(file_name)
+    elif file_format == ExportFormat.JSON:
+        df.to_json(file_name)
+    else:
+        ValueError("Unsupported file format to export data.")
+
+    return

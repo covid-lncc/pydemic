@@ -309,6 +309,15 @@ def _has_internet_connection() -> bool:  # pragma: no cover
 
 
 def _get_online_resource_as_str(resource: DataSource) -> str:
+    """
+    Convenient function to translate a DataSource enum to str compatible with COVID19Py.
+
+    :param resource:
+        An online DataSource enum for COVID19Py.
+
+    :return:
+        Equivalent string for DataSource input.
+    """
     if resource == DataSource.JHU:
         return "jhu"
     elif resource == DataSource.CSBS:

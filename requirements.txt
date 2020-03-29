@@ -3,6 +3,7 @@ attrs
 ipython
 twine
 numba
+invoke
 
 # Scientific stack
 numpy>=1.18.2

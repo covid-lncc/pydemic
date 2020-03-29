@@ -37,6 +37,11 @@ def formatters(c):
 
 
 @task
+def formatall(c):
+    c.run("pre-commit run --all-files")
+
+
+@task
 def sdist(c):
     c.run("python setup.py sdist")
 

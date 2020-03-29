@@ -52,6 +52,11 @@ def devinstall(c):
 
 
 @task
+def requirements(c):
+    c.run("pip install -r requirements.txt")
+
+
+@task
 def generatedb(c):
     c.run(
         "python -c 'import pydemic.data_collector as dc; dc.export_updated_full_dataset_from_jhu()'"

@@ -7,7 +7,7 @@
 
 ## What is it?
 
-A package to model disease spreading with SIR/SEIR-based models focused SARS-CoV-2 (COVID-19).
+A package to model disease spreading with SIR/SEIR-based models focused on SARS-CoV-2 (COVID-19).
 We are currently in a very early development stage.
 
 ## Development mode

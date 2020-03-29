@@ -63,12 +63,7 @@ class AvailableCountryData:
                 "Internet connection is unavailable. However, internet connection is required."
             )
         if self.use_internet_connection:
-            if self.online_data_source == DataSource.JHU:
-                self._source = "jhu"
-            elif self.online_data_source == DataSource.CSBS:
-                self._source = "csbs"
-            else:
-                raise ValueError("Unavailable data source.")
+            self._source = _get_online_resource_as_str(self.online_data_source)
 
             covid19 = COVID19Py.COVID19(data_source=self._source)
             self.all_data = covid19.getAll()
@@ -89,7 +84,9 @@ class AvailableCountryData:
         country_names = list()
         country_codes = list()
         country_provinces = list()
-        for entry in tqdm(self.all_data["locations"]):
+        progress_bar = tqdm(self.all_data["locations"])
+        for entry in progress_bar:
+            progress_bar.set_description("Processing available countries DataFrame")
             country_name = entry["country"]
             country_names.append(country_name)
 
@@ -186,7 +183,7 @@ class AvailableCountryData:
 class CountryDataCollector:
     country_name: str
     use_online_resources: bool = False
-    online_data_source: DataSource = None
+    online_data_source: DataSource = DataSource.JHU
     _country_code: str = None
 
     def __attrs_post_init__(self):
@@ -243,7 +240,8 @@ class CountryDataCollector:
     @property
     def get_time_series_data_frame(self) -> pd.DataFrame:
         if self.use_online_resources:
-            covid19 = COVID19Py.COVID19(data_source=self.online_data_source)
+            online_resource = _get_online_resource_as_str(self.online_data_source)
+            covid19 = COVID19Py.COVID19(data_source=online_resource)
             code = self._country_code
             location_dict = covid19.getLocationByCountryCode(code, timelines=True)
             if len(location_dict) == 1:
@@ -253,8 +251,8 @@ class CountryDataCollector:
                 data_confirmed_and_deaths_dict = {
                     "day": days_range_list,
                     "date": list(location["timelines"]["confirmed"]["timeline"].keys()),
-                    "confirmed": location["timelines"]["confirmed"]["timeline"].values,
-                    "deaths": location["timelines"]["confirmed"]["timeline"].values,
+                    "confirmed": list(location["timelines"]["confirmed"]["timeline"].values()),
+                    "deaths": list(location["timelines"]["deaths"]["timeline"].values()),
                 }
                 df_country_data = pd.DataFrame(data_confirmed_and_deaths_dict)
                 df_country_data.date = df_country_data.date.astype("datetime64[ns]")
@@ -262,7 +260,7 @@ class CountryDataCollector:
                 list_of_df_province_data = list()
                 progress_bar = tqdm(location_dict)
                 for province_data in progress_bar:
-                    progress_bar.set_description(f"Processing country {self.country_name}")
+                    progress_bar.set_description(f"Processing {self.country_name} data")
                     amount_of_days = len(province_data["timelines"]["confirmed"]["timeline"])
                     days_range_list = list(range(amount_of_days))
                     data_confirmed_and_deaths_province_dict = {
@@ -285,7 +283,7 @@ class CountryDataCollector:
                 df_country_data = (
                     df_grouped_provinces_sorted.groupby("date")["date", "confirmed", "deaths"]
                     .sum()
-                    .reset_index(drop=True)
+                    .reset_index()
                 )
         else:
             raise NotImplementedError("Offline database resources is not implemented yet.")
@@ -308,3 +306,12 @@ def _has_internet_connection() -> bool:  # pragma: no cover
     except OSError:
         pass
     return False
+
+
+def _get_online_resource_as_str(resource: DataSource) -> str:
+    if resource == DataSource.JHU:
+        return "jhu"
+    elif resource == DataSource.CSBS:
+        return "csbs"
+    else:
+        raise ValueError("Unavailable data source.")

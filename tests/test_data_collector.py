@@ -16,6 +16,24 @@ def available_countries_offline():
     return available_countries
 
 
+@fixture
+def brazil_data():
+    brazil_data = CountryDataCollector("Brazil", use_online_resources=True)
+    return brazil_data
+
+
+@fixture
+def us_data():
+    us_data = CountryDataCollector("US")
+    return us_data
+
+
+@fixture
+def china_data():
+    china_data = CountryDataCollector("China", use_online_resources=True)
+    return china_data
+
+
 @pytest.mark.parametrize(
     "available_countries",
     [
@@ -98,9 +116,16 @@ def test_unavailable_country_name_in_data_collector():
         CountryDataCollector("Brasil")
 
 
-def test_country_code_getter():
-    brazil_data = CountryDataCollector("Brazil")
+def test_country_code_getter(brazil_data, us_data):
     assert brazil_data.country_code == "BR"
-
-    us_data = CountryDataCollector("US")
     assert us_data.country_code == "US"
+
+
+def test_data_frame_for_brazil(brazil_data):
+    df_brazil_data = brazil_data.get_time_series_data_frame
+    assert df_brazil_data.shape[0] > 1
+
+
+def test_data_frame_for_china(china_data):
+    df_china_data = china_data.get_time_series_data_frame
+    assert df_china_data.shape[0] > 1

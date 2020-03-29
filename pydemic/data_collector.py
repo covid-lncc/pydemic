@@ -68,8 +68,7 @@ class AvailableCountryData:
             covid19 = COVID19Py.COVID19(data_source=self._source)
             self.all_data = covid19.getAll()
         else:
-            dirname = os.path.dirname(__file__)
-            filename = os.path.join(dirname, "../data/all_data.json")
+            filename = _get_absolute_path_relative_to_script("../data/all_data.json")
             with open(filename, "r") as fp:
                 self.all_data = json.load(fp)
 
@@ -147,8 +146,7 @@ class AvailableCountryData:
             df_country_data = df_country_data["name"].drop_duplicates()
             country_names_list = list(df_country_data.values)
         else:
-            dirname = os.path.dirname(__file__)
-            filename = os.path.join(dirname, "../data/available_countries.csv")
+            filename = _get_absolute_path_relative_to_script("../data/available_countries.csv")
             df_country_data = pd.read_csv(filename)
             df_country_data = df_country_data["name"].drop_duplicates()
             country_names_list = list(df_country_data.values)
@@ -170,8 +168,7 @@ class AvailableCountryData:
             df_country_data = df_country_data["code"].drop_duplicates()
             country_codes_list = list(df_country_data.values)
         else:
-            dirname = os.path.dirname(__file__)
-            filename = os.path.join(dirname, "../data/available_countries.csv")
+            filename = _get_absolute_path_relative_to_script("../data/available_countries.csv")
             df_country_data = pd.read_csv(filename)
             df_country_data = df_country_data["code"].drop_duplicates()
             country_codes_list = list(df_country_data.values)
@@ -286,7 +283,7 @@ class CountryDataCollector:
                     .reset_index()
                 )
         else:
-            raise NotImplementedError("Offline database resources is not implemented yet.")
+            filename = _get_absolute_path_relative_to_script("../data/available_countries.csv")
 
         return df_country_data
 
@@ -324,3 +321,19 @@ def _get_online_resource_as_str(resource: DataSource) -> str:
         return "csbs"
     else:
         raise ValueError("Unavailable data source.")
+
+
+def _get_absolute_path_relative_to_script(target_relative_path: Union[str, Path]):
+    """
+    Convenient function to get absolute paths in relation to this caller function.
+    Useful to read data files.
+
+    :param target_relative_path:
+        Relative path in relation to the present module.
+
+    :return:
+        The equivalent absolute path.
+    """
+    dirname = os.path.dirname(__file__)
+    filename_absolute = os.path.join(dirname, target_relative_path)
+    return filename_absolute

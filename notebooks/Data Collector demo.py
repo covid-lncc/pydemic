@@ -17,6 +17,11 @@
 #
 # In this notebook, a simple demonstration of how to use Data Collector features is provided.
 
+# In order to run it on Binder
+import sys
+
+sys.path.append("..")
+
 # +
 import COVID19Py
 import pandas as pd

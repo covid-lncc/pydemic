@@ -1,39 +1,39 @@
 # Python
-attrs
-ipython
-twine
-numba
-invoke
+attrs==19.3.0
+ipython==7.13.0
+twine==3.1.1
+numba==0.48.0
+invoke==1.4.1
 
 # Scientific stack
-numpy>=1.18.2
-pytest>=5.4.1
-scipy>=1.4.1
-pandas>1.0
-openpyxl>3.0
-pygmo
+numpy==1.18.2
+scipy==1.4.1
+pandas==1.0.3
+openpyxl==3.0.3
+pygmo==2.14.1
 
 # Notebooks
-jupyter
-notebook>6
-nbextensions
-jupytext
+jupyter==1.0.0
+notebook==6.0.3
+nbextensions==0.1.0
+jupytext==1.4.1
 
 # Plotting
-matplotlib
+matplotlib==3.2.1
 
 # Formatters and Checkers
-pre-commit
+pre-commit==2.2.0
 
 # Progress bar
-tqdm
+tqdm==4.44.0
 
 # Tests
-pytest-cov
-pytest-xdist
-pytest-regressions
-pytest-lazy-fixture
-codecov
+pytest==5.4.1
+pytest-cov==2.8.1
+pytest-xdist==1.31.0
+pytest-regressions==2.0.0
+pytest-lazy-fixture==0.6.3
+codecov==2.0.22
 
 # API for COVID-19
-COVID19py
+COVID19py==0.3.0

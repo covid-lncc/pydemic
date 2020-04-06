@@ -1,0 +1,60 @@
+name: pydemic
+
+channels:
+  - conda-forge
+
+dependencies:
+  # Python
+  - python<3.7
+  - attrs==19.3.0
+  - ipython==7.13.0
+  - twine==3.1.1
+  - numba==0.48.0
+  - invoke==1.4.1
+  - pip
+
+  # Scientific stack
+  - numpy==1.18.1
+  - scipy==1.4.1
+  - pandas==1.0.3
+  - openpyxl==3.0.3
+  - pygmo>=2.11
+  - pymc3==3.8
+  - mkl-service
+  - theano==1.0.4
+  - spotpy
+
+  # Notebooks
+  - jupyter==1.0.0
+  - notebook==6.0.3
+  - jupyter_contrib_nbextensions
+  - jupyter_nbextensions_configurator
+  - jupytext==1.4.1
+
+  # Plotting
+  - matplotlib==3.2.1
+  - altair==4.0.1
+
+  # Formatters and Checkers
+  - pre-commit==2.2.0
+
+  # Progress bar
+  - tqdm==4.44.0
+
+  # Tests
+  - pytest==5.4.1
+  - pytest-cov==2.8.1
+  - pytest-xdist==1.31.0
+  - pytest-regressions==2.0.0
+  - pytest-lazy-fixture==0.6.3
+  - codecov
+
+  # API for COVID-19
+  - pip:
+    - COVID19py==0.3.0
+
+environment:
+  PYTHONPATH:
+    - {{ root }}
+  NOTEBOOKS_DIR: {{ root }}/notebooks
+  DATA_DIR: {{ root }}/pydemic/data

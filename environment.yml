@@ -5,6 +5,7 @@ dependencies:
 - altair ==4.0.1
 - attrs ==19.3.0
 - codecov
+- git-lfs
 - invoke ==1.4.1
 - ipython ==7.13.0
 - jupyter ==1.0.0
@@ -29,6 +30,7 @@ dependencies:
 - pytest-xdist ==1.31.0
 - python <3.7
 - scipy ==1.4.1
+- spotpy
 - theano ==1.0.4
 - tqdm ==4.44.0
 - twine ==3.1.1

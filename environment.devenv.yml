@@ -49,6 +49,9 @@ dependencies:
   - pytest-lazy-fixture==0.6.3
   - codecov
 
+  # VCS
+  - git-lfs
+
   # API for COVID-19
   - pip:
     - COVID19py==0.3.0

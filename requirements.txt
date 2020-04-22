@@ -39,6 +39,3 @@ codecov==2.0.22
 
 # API for COVID-19
 COVID19py==0.3.0
-
-# VCS
-git-lfs

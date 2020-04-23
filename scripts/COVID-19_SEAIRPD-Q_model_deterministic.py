@@ -30,23 +30,22 @@
 # <a id="importing"></a>
 # ## Importing libs
 
-# %%
-import numpy as np  # linear algebra
-import pandas as pd  # data processing, CSV file I/O (e.g. pd.read_csv)
-from scipy.integrate import solve_ivp  # to solve ODE system
-from scipy import optimize  # to solve minimization problem from least-squares fitting
-from numba import jit  # to accelerate ODE system RHS evaluations
-import pymc3 as pm  # for uncertainty quantification and model calibration
-import theano  # to control better pymc3 backend and write a wrapper
-import theano.tensor as t  # for the wrapper to a custom model to pymc3
+import os
+import time
 
 # Plotting libs
 import matplotlib.pyplot as plt
-import altair as alt
+# %%
+import numpy as np  # linear algebra
+import pandas as pd  # data processing, CSV file I/O (e.g. pd.read_csv)
+import pymc3 as pm  # for uncertainty quantification and model calibration
+import theano  # to control better pymc3 backend and write a wrapper
+import theano.tensor as t  # for the wrapper to a custom model to pymc3
+from numba import jit  # to accelerate ODE system RHS evaluations
+from scipy import \
+    optimize  # to solve minimization problem from least-squares fitting
+from scipy.integrate import solve_ivp  # to solve ODE system
 from tqdm import trange
-import time
-
-import os
 
 seed = 12345  # for the sake of reproducibility :)
 np.random.seed(seed)

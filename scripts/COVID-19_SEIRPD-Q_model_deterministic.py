@@ -169,6 +169,7 @@ def get_df_state_cases(df: pd.DataFrame, state_name: str) -> pd.DataFrame:
     df_grouped_state_date["deaths_marker"] = df_grouped_state_date.shape[0] * ["Deaths"]
     return df_grouped_state_date
 
+
 # %%
 df_grouped_brazil = get_df_country_cases(df_covid, "Brazil")
 
@@ -909,7 +910,14 @@ plt.plot(
     linestyle="-",
     markersize=10,
 )
-plt.plot(t_computed_seirpdq, A_seirpdq, label='Asymptomatic (SEAIRPD-Q)', marker='o', linestyle="-", markersize=10)
+plt.plot(
+    t_computed_seirpdq,
+    A_seirpdq,
+    label="Asymptomatic (SEAIRPD-Q)",
+    marker="o",
+    linestyle="-",
+    markersize=10,
+)
 # plt.plot(t_computed_seirdq, R_seirdq * target_population, label='Recovered (SEIRDAQ)', marker='o', linestyle="-", markersize=10)
 plt.plot(
     t_computed_seirpdq,
@@ -1023,7 +1031,14 @@ plt.plot(
     linestyle="-",
     markersize=10,
 )
-plt.plot(t_computed_predict_seirpdq, A_predict_seirpdq, label='Asymptomatic (SEAIRPD-Q)', marker='o', linestyle="-", markersize=10)
+plt.plot(
+    t_computed_predict_seirpdq,
+    A_predict_seirpdq,
+    label="Asymptomatic (SEAIRPD-Q)",
+    marker="o",
+    linestyle="-",
+    markersize=10,
+)
 #     plt.plot(t_computed_predict_seirdaq, 100 * R_predict_seirdaq, label='Recovered (SEIRDAQ)', marker='o', linestyle="-", markersize=10)
 plt.plot(
     t_computed_predict_seirpdq,

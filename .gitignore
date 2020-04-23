@@ -1,6 +1,6 @@
 .idea/
 .pytest_cache/
-pydemic/__pycache__/
+*__pycache__/
 ./docs/.build/
 ./docs/.static/
 ./docs/.templates/
@@ -11,3 +11,6 @@ dist
 build
 
 *.csv#
+nohup.out
+calibration_realizations.csv
+environment.yml

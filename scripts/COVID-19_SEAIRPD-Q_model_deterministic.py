@@ -615,6 +615,8 @@ def seirpdq_model(
     rho=0.1,
     eta=2e-2,
     sigma=1 / 7,
+    theta=0.45,
+    t_lockdown=14,
     N=1,
 ):
     """
@@ -623,6 +625,11 @@ def seirpdq_model(
     S, E, A, I, P, R, D = X
     beta = beta0 * np.exp(-beta1 * t)
     mu = mu0 * np.exp(-mu1 * t)
+    if t >= 14:
+        beta = theta * beta0 * np.exp(-beta1 * t)
+        mu = theta * mu0 * np.exp(-mu1 * t)
+    if 14 <= t < 15:
+        omega = 0.55
     S_prime = -beta / N * S * I - mu / N * S * A - omega * S + eta * R
     E_prime = beta / N * S * I + mu / N * S * A - sigma * E - omega * E
     A_prime = sigma * (1 - rho) * E - gamma_A * A - omega * A
@@ -650,8 +657,8 @@ def seirpdq_ode_solver(
     d_P=0.003,
     epsilon_I=1 / 3,
     rho=0.88,
-    omega=1 / 10,
     sigma=1 / 6.5,
+    omega=0,
     eta=0,
     beta1=0,
     mu1=0,
@@ -774,16 +781,16 @@ dead_individuals = df_target_country.deaths.values
 # bounds_seirpdq = num_of_parameters_to_fit_seirpdq * [(0, 1)]
 
 bounds_seirpdq = [
-    (0, 1),  # beta
-    (0, 1),  # mu
+    (0, 5e-6),  # beta
+    (0, 5e-6),  # mu
     (1 / 19, 1 / 14),  # gamma_I
     (1 / 19, 1 / 14),  # gamma_A
     (1 / 19, 1 / 14),  # gamma_P
     (1e-4, 0.1),  # d_I
     (1e-4, 0.1),  # d_P (according to Imperial College report)
-    (0, 1),  # epsilon_I
+    (0.01, 0.1),  # epsilon_I
     (0.65, 0.9),  # rho
-    (0, 1),  # omega
+    # (1e-14, 2e-14),  # omega
     (1 / 7.5, 1 / 6.5),  # sigma
     (1, 5 * P0),  # E0
     (1, 5 * P0),  # A0
@@ -836,7 +843,7 @@ print(f"-- Initial conditions: {y0_seirpdq}")
     d_D_deterministic,
     epsilon_I_deterministic,
     rho_deterministic,
-    omega_deterministic,
+    # omega_deterministic,
     sigma_deterministic,
 ) = result_seirpdq.x[:-3]
 
@@ -849,6 +856,7 @@ def calculate_reproduction_number(
     return (left_term + right_term) * S0
 
 
+omega_deterministic = 0
 reproduction_number = calculate_reproduction_number(
     S0,
     beta_deterministic,
@@ -948,6 +956,27 @@ plt.ylabel("Population")
 
 plt.tight_layout()
 plt.savefig("seirpdq_deterministic_calibration.png")
+plt.show()
+
+# %%
+plt.figure(figsize=(9, 7))
+
+plt.plot(
+    t_computed_seirpdq,
+    S_seirpdq,
+    label="Susceptible (SEAIRPD-Q)",
+    marker="X",
+    linestyle="-",
+    markersize=10,
+)
+
+plt.legend()
+plt.grid()
+plt.xlabel("Time (days)")
+plt.ylabel("Population")
+
+plt.tight_layout()
+plt.savefig("seirpdq_susceptible.png")
 plt.show()
 
 
@@ -1067,6 +1096,27 @@ plt.grid()
 
 plt.tight_layout()
 plt.savefig("seirpdq_deterministic_predictions.png")
+plt.show()
+
+# %%
+plt.figure(figsize=(9, 7))
+
+plt.plot(
+    t_computed_predict_seirpdq,
+    S_predict_seirpdq,
+    label="Susceptible (SEAIRPD-Q)",
+    marker="X",
+    linestyle="-",
+    markersize=10,
+)
+
+plt.legend()
+plt.grid()
+plt.xlabel("Time (days)")
+plt.ylabel("Population")
+
+plt.tight_layout()
+plt.savefig("seirpdq_susceptible_prediction.png")
 plt.show()
 
 # %%

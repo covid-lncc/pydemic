@@ -139,7 +139,6 @@ def test_data_frame_for_brazil(brazil_data):
     assert df_brazil_data.shape[1] > 1
 
 
-@pytest.mark.xfail(reason="File inconsistency, please investigate")
 def test_data_frame_for_brazil_offline(brazil_data_offline):
     df_brazil_data = brazil_data_offline.get_time_series_data_frame
     assert df_brazil_data.shape[0] > 1
@@ -152,7 +151,6 @@ def test_data_frame_for_china(china_data):
     assert df_china_data.shape[1] > 1
 
 
-@pytest.mark.xfail(reason="File inconsistency, please investigate")
 def test_data_frame_for_china_offline(china_data_offline):
     df_china_data = china_data_offline.get_time_series_data_frame
     assert df_china_data.shape[0] > 1

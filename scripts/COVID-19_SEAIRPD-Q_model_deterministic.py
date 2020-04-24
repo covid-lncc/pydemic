@@ -625,10 +625,10 @@ def seirpdq_model(
     S, E, A, I, P, R, D = X
     beta = beta0 * np.exp(-beta1 * t)
     mu = mu0 * np.exp(-mu1 * t)
-    if t >= 14:
+    if t >= t_lockdown:
         beta = theta * beta0 * np.exp(-beta1 * t)
         mu = theta * mu0 * np.exp(-mu1 * t)
-    if 14 <= t < 15:
+    if t_lockdown <= t < t_lockdown + 1:
         omega = 0.55
     S_prime = -beta / N * S * I - mu / N * S * A - omega * S + eta * R
     E_prime = beta / N * S * I + mu / N * S * A - sigma * E - omega * E

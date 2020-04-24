@@ -579,6 +579,13 @@ target_population
 # Initial Conditions:
 
 # %%
+df_brazil_cases_by_day = pd.read_csv(f"{DATA_PATH}/brazil_by_day.csv", parse_dates=["date"])
+df_brazil_cases_by_day = df_brazil_cases_by_day[df_brazil_cases_by_day.confirmed > 5]
+df_brazil_cases_by_day = df_brazil_cases_by_day.reset_index(drop=True)
+df_brazil_cases_by_day["day"] = df_brazil_cases_by_day.date.apply(
+    lambda x: (x - df_brazil_cases_by_day.date.min()).days
+)
+
 df_target_country = df_brazil_cases_by_day
 E0, A0, I0, P0, R0, D0 = (
     int(5 * float(df_target_country.confirmed[0])),
@@ -730,6 +737,11 @@ def seirpdq_least_squares_error_ode_y0(
     f_exp1, f_exp2 = f_exp
     time_span = (time_exp.min(), time_exp.max())
 
+    # weighting_for_exp1_constraints = 1 / (f_exp1.max() / (f_exp1.max() + f_exp2.max()))
+    # weighting_for_exp2_constraints = 1 / (f_exp2.max() / (f_exp1.max() + f_exp2.max()))
+    weighting_for_exp1_constraints = 1e0
+    weighting_for_exp2_constraints = 1e3
+
     try:
         y_model = fitting_model(initial_conditions, time_span, time_exp, *args)
         simulated_time = y_model.t
@@ -739,8 +751,6 @@ def seirpdq_least_squares_error_ode_y0(
         residual1 = f_exp1 - simulated_qoi1
         residual2 = f_exp2 - simulated_qoi2
 
-        weighting_for_exp1_constraints = 1e0
-        weighting_for_exp2_constraints = 1e0
         num_of_measures = len(residual1)
 
         first_term = weighting_for_exp1_constraints * np.sum(residual1 ** 2.0)
@@ -774,8 +784,8 @@ dead_individuals = df_target_country.deaths.values
 # bounds_seirpdq = num_of_parameters_to_fit_seirpdq * [(0, 1)]
 
 bounds_seirpdq = [
-    (0, 1),  # beta
-    (0, 1),  # mu
+    (0, 1e-5),  # beta
+    (0, 1e-5),  # mu
     (1 / 19, 1 / 14),  # gamma_I
     (1 / 19, 1 / 14),  # gamma_A
     (1 / 19, 1 / 14),  # gamma_P
@@ -806,7 +816,7 @@ result_seirpdq = optimize.differential_evolution(
     ),
     popsize=30,
     strategy="best1bin",
-    tol=5e-5,
+    tol=1e-5,
     recombination=0.95,
     mutation=0.6,
     maxiter=10000,
@@ -988,7 +998,7 @@ print(df_deaths_estimates.to_latex(index=False))
 t0 = float(data_time.min())
 number_of_days_after_last_record = 120
 tf = data_time.max() + number_of_days_after_last_record
-time_range = np.linspace(0.0, tf, int(tf))
+time_range = np.linspace(t0, tf, int(tf - t0) + 1)
 
 solution_ODE_predict_seirpdq = seirpdq_ode_solver(
     y0_seirpdq, (t0, tf), time_range, *result_seirpdq.x[:-3]

@@ -218,3 +218,41 @@ for ax, variable_name in zip(axs.flat, y_last_results):
     ax.label_outer()
 
 plt.savefig("eta_continuation.png", dpi=300)
+
+# Projecting results
+
+t0 = 0
+tf = 10000
+time = np.linspace(t0, tf)
+parameters = fixed_parameters
+parameters["eta"] = 0.0075
+solution_ODE_seirpdq = seairpdq_ode_solver(seairpdq_y0, time, **parameters)
+t_computed_seairpdq, y_computed_seairpdq = solution_ODE_seirpdq.t, solution_ODE_seirpdq.y
+y_projections_results = {
+    "S": y_computed_seairpdq[0],
+    "E": y_computed_seairpdq[1],
+    "A": y_computed_seairpdq[2],
+    "I": y_computed_seairpdq[3],
+    "P": y_computed_seairpdq[4],
+    "R": y_computed_seairpdq[5],
+    "D": y_computed_seairpdq[6],
+}
+
+fig, axs = plt.subplots(num_of_state_variables, sharex=True, gridspec_kw={"hspace": 1})
+index = 0
+results_progress_bar = tqdm(y_projections_results)
+for variable_name in results_progress_bar:
+    results_progress_bar.set_description("Plotting projections")
+    variable_result = y_projections_results[variable_name]
+
+    color = colors_list[index]
+    axs[index].plot(time, variable_result, color=color)
+
+    index += 1
+
+for ax, variable_name in zip(axs.flat, y_last_results):
+    ax.set(xlabel=r"Time (days)", ylabel=f"{variable_name}", xlim=(t0, tf))
+    ax.label_outer()
+
+plt.tight_layout()
+plt.savefig("projection.png", dpi=300)

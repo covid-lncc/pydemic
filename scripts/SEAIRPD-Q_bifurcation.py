@@ -250,7 +250,7 @@ for variable_name in results_progress_bar:
 
     index += 1
 
-for ax, variable_name in zip(axs.flat, y_last_results):
+for ax, variable_name in zip(axs.flat, y_projections_results):
     ax.set(xlabel=r"Time (days)", ylabel=f"{variable_name}", xlim=(t0, tf))
     ax.label_outer()
 

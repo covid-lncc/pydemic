@@ -789,9 +789,9 @@ bounds_seirpdq = [
     (1 / 19, 1 / 14),  # gamma_I
     (1 / 19, 1 / 14),  # gamma_A
     (1 / 19, 1 / 14),  # gamma_P
-    (1e-4, 0.1),  # d_I
-    (1e-4, 0.1),  # d_P (according to Imperial College report)
-    (0, 1),  # epsilon_I
+    (1e-5, 0.1),  # d_I
+    (1e-5, 0.1),  # d_P (according to Imperial College report)
+    (0, 0.2),  # epsilon_I
     (0.65, 0.9),  # rho
     (0, 1),  # omega
     (1 / 7.5, 1 / 6.5),  # sigma

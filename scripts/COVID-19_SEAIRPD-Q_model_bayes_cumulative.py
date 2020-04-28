@@ -586,8 +586,15 @@ df_brazil_cases_by_day["day"] = df_brazil_cases_by_day.date.apply(
     lambda x: (x - df_brazil_cases_by_day.date.min()).days
 )
 
+df_rio_cases_by_day = pd.read_csv(f"{DATA_PATH}/rio_covid19.csv")
+df_rio_cases_by_day["active"] = (
+    df_rio_cases_by_day["cases"] - df_rio_cases_by_day["deaths"] - df_rio_cases_by_day["recoveries"]
+)
+rio_columns_rename = {"cases": "confirmed", "recoveries": "recovered"}
+df_rio_cases_by_day.rename(columns=rio_columns_rename, inplace=True)
+
 df_target_country = df_brazil_cases_by_day
-E0, A0, I0, P0, R0, D0, C0 = (
+E0, A0, I0, P0, R0, D0, C0, H0 = (
     int(5 * float(df_target_country.confirmed[0])),
     int(1.8 * float(df_target_country.confirmed[0])),
     int(1.2 * float(df_target_country.confirmed[0])),
@@ -595,9 +602,11 @@ E0, A0, I0, P0, R0, D0, C0 = (
     int(float(df_target_country.recovered[0])),
     int(float(df_target_country.deaths[0])),
     int(float(df_target_country.confirmed[0])),
+    int(float(df_target_country.recovered[0])),
 )
+
 S0 = target_population - (E0 + A0 + I0 + R0 + P0 + D0)
-y0_seirpdq = S0, E0, A0, I0, P0, R0, D0, C0  # SEIRPDQ IC array (not used anymore)
+y0_seirpdq = S0, E0, A0, I0, P0, R0, D0, C0, H0  # SEIRPDQ IC array (not fully used)
 # print(y0_seirpdq)
 
 # %% [markdown]
@@ -628,7 +637,7 @@ def seirpdq_model(
     """
     SEIRPD-Q python implementation.
     """
-    S, E, A, I, P, R, D, C = X
+    S, E, A, I, P, R, D, C, H = X
     beta = beta0 * np.exp(-beta1 * t)
     mu = mu0 * np.exp(-mu1 * t)
     S_prime = -beta / N * S * I - mu / N * S * A - omega * S + eta * R
@@ -639,7 +648,8 @@ def seirpdq_model(
     R_prime = gamma_A * A + gamma_I * I + gamma_P * P + omega * (S + E + A + I) - eta * R
     D_prime = d_I * I + d_P * P
     C_prime = epsilon_I * I
-    return S_prime, E_prime, A_prime, I_prime, P_prime, R_prime, D_prime, C_prime
+    H_prime = gamma_P * P
+    return S_prime, E_prime, A_prime, I_prime, P_prime, R_prime, D_prime, C_prime, H_prime
 
 
 # %% [markdown]
@@ -702,65 +712,64 @@ def seirpdq_ode_solver(
 # Now, we can know how to solve the forward problem, so we can try to fit it with a non-linear Least-Squares method for parameter estimation. Let's begin with a generic Least-Square formulation:
 
 # %%
-def seirpdq_least_squares_error_ode(par, time_exp, f_exp, fitting_model, initial_conditions):
-    args = par
-    f_exp1, f_exp2 = f_exp
-    time_span = (time_exp.min(), time_exp.max())
-
-    y_model = fitting_model(initial_conditions, time_span, time_exp, *args)
-    simulated_time = y_model.t
-    simulated_ode_solution = y_model.y
-    _, _, _, _, simulated_qoi1, _, simulated_qoi2 = simulated_ode_solution
-
-    residual1 = f_exp1 - simulated_qoi1
-    residual2 = f_exp2 - simulated_qoi2
-
-    weighting_for_exp1_constraints = 1e0
-    weighting_for_exp2_constraints = 1e0
-    num_of_measures = len(residual1)
-
-    first_term = weighting_for_exp1_constraints * np.sum(residual1 ** 2.0)
-    second_term = weighting_for_exp2_constraints * np.sum(residual2 ** 2.0)
-    objective_function = (1 / num_of_measures) * (first_term + second_term)
-    return objective_function
-
-
 def seirpdq_least_squares_error_ode_y0(
     par, time_exp, f_exp, fitting_model, known_initial_conditions, total_population
 ):
     num_of_initial_conditions_to_fit = 3
     num_of_parameters = len(par) - num_of_initial_conditions_to_fit
-    args, trial_initial_conditions = par[:num_of_parameters], par[num_of_parameters:]
+    args, trial_initial_conditions = [
+        par[:num_of_parameters],
+        par[num_of_parameters:],
+    ]
     E0, A0, I0 = trial_initial_conditions
-    _, P0, R0, D0, C0 = known_initial_conditions
+    _, P0, R0, D0, C0, H0 = known_initial_conditions
     S0 = total_population - (E0 + A0 + I0 + R0 + P0 + D0)
-    initial_conditions = [S0, E0, A0, I0, P0, R0, D0, C0]
+    initial_conditions = [S0, E0, A0, I0, P0, R0, D0, C0, H0]
 
-    f_exp1, f_exp2, f_exp3 = f_exp
+    f_exp1, f_exp2, f_exp3, f_exp4 = f_exp
     time_span = (time_exp.min(), time_exp.max())
 
-    # weighting_for_exp1_constraints = 1 / (f_exp1.max() / (f_exp1.max() + f_exp2.max()))
-    # weighting_for_exp2_constraints = 1 / (f_exp2.max() / (f_exp1.max() + f_exp2.max()))
-    weighting_for_exp1_constraints = 1e0
-    weighting_for_exp2_constraints = 1e2
-    weighting_for_exp3_constraints = 1e2
+    # weighting_denominator = f_exp1.max() + f_exp2.max() + f_exp3.max() + f_exp4.max()
+    # weighting_for_exp1_constraints = 1 / (f_exp1.max() / weighting_denominator)
+    # weighting_for_exp2_constraints = 1 / (f_exp2.max() / weighting_denominator)
+    # weighting_for_exp3_constraints = 1 / (f_exp3.max() / weighting_denominator)
+    # weighting_for_exp4_constraints = 1 / (f_exp4.max() / weighting_denominator)
+    weighting_for_exp1_constraints = 0e0
+    weighting_for_exp2_constraints = 1e0
+    weighting_for_exp3_constraints = 1e0
+    weighting_for_exp4_constraints = 0e0
+    num_of_qoi = len(f_exp1)
 
     try:
         y_model = fitting_model(initial_conditions, time_span, time_exp, *args)
         simulated_time = y_model.t
         simulated_ode_solution = y_model.y
-        _, _, _, _, simulated_qoi1, _, simulated_qoi2, simulated_qoi3 = simulated_ode_solution
+        (
+            _,
+            _,
+            _,
+            _,
+            simulated_qoi1,
+            _,
+            simulated_qoi2,
+            simulated_qoi3,
+            simulated_qoi4,
+        ) = simulated_ode_solution
 
         residual1 = f_exp1 - simulated_qoi1
         residual2 = f_exp2 - simulated_qoi2
         residual3 = f_exp3 - simulated_qoi3
-
-        num_of_measures = len(residual1)
+        residual4 = f_exp4 - simulated_qoi4
 
         first_term = weighting_for_exp1_constraints * np.sum(residual1 ** 2.0)
         second_term = weighting_for_exp2_constraints * np.sum(residual2 ** 2.0)
         third_term = weighting_for_exp3_constraints * np.sum(residual3 ** 2.0)
-        objective_function = (1 / num_of_measures) * (first_term + second_term + third_term)
+        fourth_term = weighting_for_exp4_constraints * np.sum(residual4 ** 2.0)
+        # first_term = weighting_for_exp1_constraints * np.abs(residual1).sum()
+        # second_term = weighting_for_exp2_constraints * np.abs(residual2).sum()
+        # third_term = weighting_for_exp3_constraints * np.abs(residual3).sum()
+        # fourth_term = weighting_for_exp4_constraints * np.abs(residual4).sum()
+        objective_function = 1 / num_of_qoi * (first_term + second_term + third_term + fourth_term)
     except ValueError:
         objective_function = 1e15
 
@@ -779,6 +788,7 @@ data_time = df_target_country.day.values.astype(np.float64)
 infected_individuals = df_target_country.active.values
 dead_individuals = df_target_country.deaths.values
 confirmed_cases = df_target_country.confirmed.values
+recovered_cases = df_target_country.recovered.values
 
 # %% [markdown]
 # To calibrate the model, we define an objective function, which is a Least-Squares function in the present case, and minimize it. To (*try to*) avoid local minima, we use Differential Evolution (DE) method (see this [nice presentation](https://www.maths.uq.edu.au/MASCOS/Multi-Agent04/Fleetwood.pdf) to get yourself introduced to this great subject). In summary, DE is a family of Evolutionary Algorithms that aims to solve Global Optimization problems. Moreover, DE is derivative-free and population-based method.
@@ -792,9 +802,9 @@ confirmed_cases = df_target_country.confirmed.values
 bounds_seirpdq = [
     (0, 1e-5),  # beta
     (0, 1e-5),  # mu
-    (1 / 19, 1 / 14),  # gamma_I
-    (1 / 19, 1 / 14),  # gamma_A
-    (1 / 19, 1 / 14),  # gamma_P
+    (1 / 21, 1 / 14),  # gamma_I
+    (1 / 21, 1 / 14),  # gamma_A
+    (1 / 21, 1 / 14),  # gamma_P
     (1e-5, 0.1),  # d_I
     (1e-5, 0.1),  # d_P (according to Imperial College report)
     (0, 0.2),  # epsilon_I
@@ -805,7 +815,7 @@ bounds_seirpdq = [
     (1, 5 * P0),  # A0
     (1, 20 * P0),  # I0
 ]
-y0_seirpdq_known = S0, P0, R0, D0, C0
+y0_seirpdq_known = S0, P0, R0, D0, C0, H0
 # bounds_seirdaq = [(0, 1e-2), (0, 1), (0, 1), (0, 0.2), (0, 0.2), (0, 0.2)]
 
 result_seirpdq = optimize.differential_evolution(
@@ -815,7 +825,7 @@ result_seirpdq = optimize.differential_evolution(
     # args=(data_time, [infected_individuals, dead_individuals], seirpdq_ode_solver, y0_seirpdq),
     args=(
         data_time,
-        [infected_individuals, dead_individuals, confirmed_cases],
+        [infected_individuals, dead_individuals, confirmed_cases, recovered_cases],
         seirpdq_ode_solver,
         y0_seirpdq_known,
         target_population,
@@ -838,7 +848,7 @@ print(result_seirpdq)
 # %%
 estimated_y0 = result_seirpdq.x[-3:]
 E0, A0, I0 = estimated_y0
-y0_seirpdq = S0, int(E0), int(A0), int(I0), P0, R0, D0, C0
+y0_seirpdq = S0, int(E0), int(A0), int(I0), P0, R0, D0, C0, H0
 print(f"-- Initial conditions: {y0_seirpdq}")
 
 # %%
@@ -893,6 +903,7 @@ t_computed_seirpdq, y_computed_seirpdq = solution_ODE_seirpdq.t, solution_ODE_se
     R_seirpdq,
     D_seirpdq,
     C_seirpdq,
+    H_seirpdq,
 ) = y_computed_seirpdq
 
 
@@ -975,6 +986,56 @@ plt.tight_layout()
 plt.savefig("seirpdq_deterministic_calibration.png")
 plt.show()
 
+# %%
+plt.figure(figsize=(9, 7))
+
+plt.plot(
+    t_computed_seirpdq,
+    C_seirpdq,
+    label="Cases (SEAIRPD-Q)",
+    marker="X",
+    linestyle="-",
+    markersize=10,
+)
+
+plt.plot(
+    t_computed_seirpdq,
+    H_seirpdq,
+    label="Recovered (SEAIRPD-Q)",
+    marker="D",
+    linestyle="-",
+    markersize=10,
+)
+
+plt.plot(
+    t_computed_seirpdq,
+    D_seirpdq,
+    label="Deaths (SEAIRPD-Q)",
+    marker="v",
+    linestyle="-",
+    markersize=10,
+)
+
+plt.plot(
+    data_time, confirmed_cases, label="Confirmed data", marker="s", linestyle="", markersize=10
+)
+
+plt.plot(
+    data_time, dead_individuals, label="Recorded deaths", marker="v", linestyle="", markersize=10
+)
+
+plt.plot(
+    data_time, recovered_cases, label="Recorded recoveries", marker="v", linestyle="", markersize=10
+)
+
+plt.xlabel("Time (days)")
+plt.ylabel("Population")
+plt.legend()
+plt.grid()
+
+plt.tight_layout()
+plt.savefig("seirpdq_deterministic_cumulative_calibration.png")
+plt.show()
 
 # %%
 methods_list = list()
@@ -1032,6 +1093,7 @@ t_computed_predict_seirpdq, y_computed_predict_seirpdq = (
     R_predict_seirpdq,
     D_predict_seirpdq,
     C_predict_seirpdq,
+    H_predict_seirpdq,
 ) = y_computed_predict_seirpdq
 
 # %% [markdown]
@@ -1040,7 +1102,7 @@ t_computed_predict_seirpdq, y_computed_predict_seirpdq = (
 # %%
 has_to_plot_infection_peak = True
 
-crisis_day_seirpdq = np.argmax(P_predict_seirpdq)
+crisis_day_seirpdq = np.argmax(P_predict_seirpdq) + 1
 
 
 # %%
@@ -1103,6 +1165,57 @@ plt.savefig("seirpdq_deterministic_predictions.png")
 plt.show()
 
 # %%
+plt.figure(figsize=(9, 7))
+
+plt.plot(
+    t_computed_predict_seirpdq,
+    C_predict_seirpdq,
+    label="Cases (SEAIRPD-Q)",
+    marker="X",
+    linestyle="-",
+    markersize=10,
+)
+
+plt.plot(
+    t_computed_predict_seirpdq,
+    H_predict_seirpdq,
+    label="Recovered (SEAIRPD-Q)",
+    marker="D",
+    linestyle="-",
+    markersize=10,
+)
+
+plt.plot(
+    t_computed_predict_seirpdq,
+    D_predict_seirpdq,
+    label="Deaths (SEAIRPD-Q)",
+    marker="v",
+    linestyle="-",
+    markersize=10,
+)
+
+plt.plot(
+    data_time, confirmed_cases, label="Confirmed data", marker="s", linestyle="", markersize=10
+)
+
+plt.plot(
+    data_time, dead_individuals, label="Recorded deaths", marker="v", linestyle="", markersize=10
+)
+
+plt.plot(
+    data_time, recovered_cases, label="Recorded recoveries", marker="v", linestyle="", markersize=10
+)
+
+plt.xlabel("Time (days)")
+plt.ylabel("Population")
+plt.legend()
+plt.grid()
+
+plt.tight_layout()
+plt.savefig("seirpdq_deterministic_cumulative_predictions.png")
+plt.show()
+
+# %%
 print(
     f"-- Max number of diagnosed individuals (SEIRPD-Q model):\t {int(np.max(P_predict_seirpdq))}"
 )
@@ -1123,7 +1236,7 @@ print(f"-- Reproduction number (R0):\t {reproduction_number:.3f}")
 # ## Bayesian Calibration
 
 # %%
-observations_to_fit = np.vstack([infected_individuals, dead_individuals, confirmed_cases])
+observations_to_fit = np.vstack([dead_individuals, confirmed_cases])
 
 
 # %%
@@ -1137,7 +1250,7 @@ def seirpdq_ode_wrapper(time_exp, initial_conditions, beta, gamma, delta, theta)
     y_model = seirpdq_ode_solver(initial_conditions, time_span, time_exp, *args)
     simulated_time = y_model.t
     simulated_ode_solution = y_model.y
-    _, _, _, _, simulated_qoi1, simulated_qoi2 = simulated_ode_solution
+    (_, _, _, _, _, _, simulated_qoi1, simulated_qoi2, _,) = simulated_ode_solution
 
     concatenate_simulated_qoi = np.vstack([simulated_qoi1, simulated_qoi2])
 
@@ -1196,17 +1309,18 @@ def seirpdq_ode_wrapper_with_y0(
         E0,
         A0,
         I0,
-        initial_conditions[4],
-        initial_conditions[5],
-        initial_conditions[6],
-        initial_conditions[7],
+        initial_conditions[4],  # P
+        initial_conditions[5],  # R
+        initial_conditions[6],  # D
+        initial_conditions[7],  # C
+        initial_conditions[8],  # H
     )
     y_model = seirpdq_ode_solver(initial_conditions, time_span, time_exp, *args)
     simulated_time = y_model.t
     simulated_ode_solution = y_model.y
-    _, _, _, _, simulated_qoi1, _, simulated_qoi2, simulated_qoi3 = simulated_ode_solution
+    (_, _, _, _, _, _, simulated_qoi1, simulated_qoi2, _,) = simulated_ode_solution
 
-    concatenate_simulated_qoi = np.vstack([simulated_qoi1, simulated_qoi2, simulated_qoi3])
+    concatenate_simulated_qoi = np.vstack([simulated_qoi1, simulated_qoi2])
 
     return concatenate_simulated_qoi
 
@@ -1517,25 +1631,19 @@ sd_pop
 plt.figure(figsize=(9, 7))
 
 plt.plot(
-    data_time,
-    y_fit[0],
-    "b",
-    label="Diagnosed (SEAIRPD-Q)",
-    marker="D",
-    linestyle="-",
-    markersize=10,
+    data_time, y_fit[0], "r", label="Deaths (SEAIRPD-Q)", marker="D", linestyle="-", markersize=10,
 )
-plt.fill_between(data_time, y_min[0], y_max[0], color="b", alpha=0.2)
+plt.fill_between(data_time, y_min[0], y_max[0], color="r", alpha=0.2)
 
 plt.plot(
-    data_time, y_fit[1], "r", label="Deaths (SEAIRPD-Q)", marker="v", linestyle="-", markersize=10
+    data_time, y_fit[1], "b", label="Cases (SEAIRPD-Q)", marker="v", linestyle="-", markersize=10
 )
-plt.fill_between(data_time, y_min[1], y_max[1], color="r", alpha=0.2)
+plt.fill_between(data_time, y_min[1], y_max[1], color="b", alpha=0.2)
 
 # plt.errorbar(data_time, infected_individuals, yerr=sd_pop, label='Recorded diagnosed', linestyle='None', marker='s', markersize=10)
 # plt.errorbar(data_time, dead_individuals, yerr=sd_pop, label='Recorded deaths', marker='v', linestyle="None", markersize=10)
 plt.plot(
-    data_time, infected_individuals, label="Diagnosed data", marker="s", linestyle="", markersize=10
+    data_time, confirmed_cases, label="Confirmed data", marker="s", linestyle="", markersize=10
 )
 plt.plot(
     data_time, dead_individuals, label="Recorded deaths", marker="v", linestyle="", markersize=10
@@ -1624,6 +1732,7 @@ P_predicted = list()
 R_predicted = list()
 D_predicted = list()
 C_predicted = list()
+H_predicted = list()
 number_of_total_realizations = len(beta_prediction)
 for realization in trange(number_of_total_realizations):
     parameters_realization = [
@@ -1648,12 +1757,13 @@ for realization in trange(number_of_total_realizations):
         R0,
         D0,
         C0,
+        H0,
     )
     solution_ODE_predict = seirpdq_ode_solver(
         y0_estimated, (t0, tf), time_range, *parameters_realization
     )
     t_computed_predict, y_computed_predict = solution_ODE_predict.t, solution_ODE_predict.y
-    S, E, A, I, P, R, D, C = y_computed_predict
+    S, E, A, I, P, R, D, C, H = y_computed_predict
 
     S_predicted.append(S)
     E_predicted.append(E)
@@ -1663,6 +1773,7 @@ for realization in trange(number_of_total_realizations):
     R_predicted.append(R)
     D_predicted.append(D)
     C_predicted.append(C)
+    H_predicted.append(H)
 
 S_predicted = np.array(S_predicted)
 E_predicted = np.array(E_predicted)
@@ -1672,11 +1783,12 @@ P_predicted = np.array(P_predicted)
 R_predicted = np.array(R_predicted)
 D_predicted = np.array(D_predicted)
 C_predicted = np.array(C_predicted)
+H_predicted = np.array(H_predicted)
 
 percentile_cut = 2.5
-P_min = np.percentile(P_predicted, percentile_cut, axis=0)
-P_max = np.percentile(P_predicted, 100 - percentile_cut, axis=0)
-P_mean = np.percentile(P_predicted, 50, axis=0)
+C_min = np.percentile(C_predicted, percentile_cut, axis=0)
+C_max = np.percentile(C_predicted, 100 - percentile_cut, axis=0)
+C_mean = np.percentile(C_predicted, 50, axis=0)
 
 D_min = np.percentile(D_predicted, percentile_cut, axis=0)
 D_max = np.percentile(D_predicted, 100 - percentile_cut, axis=0)
@@ -1687,14 +1799,14 @@ plt.figure(figsize=(9, 7))
 
 plt.plot(
     t_computed_predict,
-    P_mean,
+    C_mean,
     "b",
-    label="Diagnosed (SEAIRPD-Q)",
+    label="Cases (SEAIRPD-Q)",
     marker="D",
     linestyle="-",
     markersize=10,
 )
-plt.fill_between(t_computed_predict, P_min, P_max, color="b", alpha=0.2)
+plt.fill_between(t_computed_predict, C_min, C_max, color="b", alpha=0.2)
 
 plt.plot(
     t_computed_predict,
@@ -1710,7 +1822,7 @@ plt.fill_between(t_computed_predict, D_min, D_max, color="r", alpha=0.2)
 # plt.errorbar(data_time, infected_individuals, yerr=sd_pop, label='Recorded diagnosed', linestyle='None', marker='s', markersize=10)
 # plt.errorbar(data_time, dead_individuals, yerr=sd_pop, label='Recorded deaths', marker='v', linestyle="None", markersize=10)
 plt.plot(
-    data_time, infected_individuals, label="Diagnosed data", marker="s", linestyle="", markersize=10
+    data_time, confirmed_cases, label="Confirmed data", marker="s", linestyle="", markersize=10
 )
 plt.plot(
     data_time, dead_individuals, label="Recorded deaths", marker="v", linestyle="", markersize=10

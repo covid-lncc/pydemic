@@ -573,7 +573,7 @@ spain_population = float(df_population[df_population.Country == "Spain "].Popula
 iran_population = float(df_population[df_population.Country == "Iran "].Population)
 us_population = float(df_population[df_population.Country == "United States "].Population)
 
-target_population = us_population
+target_population = brazil_population
 target_population
 
 # %% [markdown]
@@ -588,16 +588,13 @@ df_brazil_cases_by_day["day"] = df_brazil_cases_by_day.date.apply(
 )
 
 df_rio_cases_by_day = pd.read_csv(f"{DATA_PATH}/rio_covid19.csv")
-# df_rio_cases_by_day = df_rio_cases_by_day[df_rio_cases_by_day.confirmed > 5]
-# df_rio_cases_by_day = df_rio_cases_by_day.reset_index(drop=True)
-# df_rio_cases_by_day["day"] = df_rio_cases_by_day.date.apply(
-#     lambda x: (x - df_rio_cases_by_day.date.min()).days
-# )
 df_rio_cases_by_day["active"] = (
     df_rio_cases_by_day["cases"] - df_rio_cases_by_day["deaths"] - df_rio_cases_by_day["recoveries"]
 )
+rio_columns_rename = {"cases": "confirmed", "recoveries": "recovered"}
+df_rio_cases_by_day.rename(columns=rio_columns_rename, inplace=True)
 
-df_target_country = df_usa_cases_by_day
+df_target_country = df_brazil_cases_by_day
 E0, A0, I0, P0, R0, D0, C0, H0 = (
     int(5 * float(df_target_country.confirmed[0])),
     int(1.8 * float(df_target_country.confirmed[0])),
@@ -608,18 +605,9 @@ E0, A0, I0, P0, R0, D0, C0, H0 = (
     int(float(df_target_country.confirmed[0])),
     int(float(df_target_country.recovered[0])),
 )
-# E0, A0, I0, P0, R0, D0, C0, H0 = (
-#     int(5 * float(df_target_country.cases[0])),
-#     int(1.8 * float(df_target_country.cases[0])),
-#     int(1.2 * float(df_target_country.cases[0])),
-#     int(float(df_target_country.active[0])),
-#     int(float(df_target_country.recoveries[0])),
-#     int(float(df_target_country.deaths[0])),
-#     int(float(df_target_country.cases[0])),
-#     int(float(df_target_country.recoveries[0])),
-# )
+
 S0 = target_population - (E0 + A0 + I0 + R0 + P0 + D0)
-y0_seirpdq = S0, E0, A0, I0, P0, R0, D0, C0, H0  # SEIRPDQ IC array (not used anymore)
+y0_seirpdq = S0, E0, A0, I0, P0, R0, D0, C0, H0  # SEIRPDQ IC array (not fully used)
 # print(y0_seirpdq)
 
 # %% [markdown]
@@ -659,8 +647,7 @@ def seirpdq_model(
     I_prime = sigma * rho * E - gamma_I * I - d_I * I - omega * I - epsilon_I * I
     P_prime = epsilon_I * I - gamma_P * P - d_P * P
     R_prime = gamma_A * A + gamma_I * I + gamma_P * P + omega * (S + E + A + I) - eta * R
-    # D_prime = d_I * I + d_P * P
-    D_prime = d_P * P
+    D_prime = d_I * I + d_P * P
     C_prime = epsilon_I * I
     H_prime = gamma_P * P
     return S_prime, E_prime, A_prime, I_prime, P_prime, R_prime, D_prime, C_prime, H_prime
@@ -726,29 +713,6 @@ def seirpdq_ode_solver(
 # Now, we can know how to solve the forward problem, so we can try to fit it with a non-linear Least-Squares method for parameter estimation. Let's begin with a generic Least-Square formulation:
 
 # %%
-def seirpdq_least_squares_error_ode(par, time_exp, f_exp, fitting_model, initial_conditions):
-    args = par
-    f_exp1, f_exp2 = f_exp
-    time_span = (time_exp.min(), time_exp.max())
-
-    y_model = fitting_model(initial_conditions, time_span, time_exp, *args)
-    simulated_time = y_model.t
-    simulated_ode_solution = y_model.y
-    _, _, _, _, simulated_qoi1, _, simulated_qoi2 = simulated_ode_solution
-
-    residual1 = f_exp1 - simulated_qoi1
-    residual2 = f_exp2 - simulated_qoi2
-
-    weighting_for_exp1_constraints = 1e0
-    weighting_for_exp2_constraints = 1e0
-    num_of_measures = len(residual1)
-
-    first_term = weighting_for_exp1_constraints * np.sum(residual1 ** 2.0)
-    second_term = weighting_for_exp2_constraints * np.sum(residual2 ** 2.0)
-    objective_function = (1 / num_of_measures) * (first_term + second_term)
-    return objective_function
-
-
 def seirpdq_least_squares_error_ode_y0(
     par, time_exp, f_exp, fitting_model, known_initial_conditions, total_population
 ):
@@ -772,9 +736,9 @@ def seirpdq_least_squares_error_ode_y0(
     # weighting_for_exp3_constraints = 1 / (f_exp3.max() / weighting_denominator)
     # weighting_for_exp4_constraints = 1 / (f_exp4.max() / weighting_denominator)
     weighting_for_exp1_constraints = 0e0
-    weighting_for_exp2_constraints = 1e2
+    weighting_for_exp2_constraints = 1e0
     weighting_for_exp3_constraints = 1e0
-    weighting_for_exp4_constraints = 1e2
+    weighting_for_exp4_constraints = 0e0
     num_of_qoi = len(f_exp1)
 
     try:
@@ -895,9 +859,7 @@ data_time = df_target_country.day.values.astype(np.float64)
 infected_individuals = df_target_country.active.values
 dead_individuals = df_target_country.deaths.values
 confirmed_cases = df_target_country.confirmed.values
-# confirmed_cases = df_target_country.cases.values
 recovered_cases = df_target_country.recovered.values
-# recovered_cases = df_target_country.recoveries.values
 
 # %% [markdown]
 # To calibrate the model, we define an objective function, which is a Least-Squares function in the present case, and minimize it. To (*try to*) avoid local minima, we use Differential Evolution (DE) method (see this [nice presentation](https://www.maths.uq.edu.au/MASCOS/Multi-Agent04/Fleetwood.pdf) to get yourself introduced to this great subject). In summary, DE is a family of Evolutionary Algorithms that aims to solve Global Optimization problems. Moreover, DE is derivative-free and population-based method.
@@ -918,7 +880,7 @@ bounds_seirpdq = [
     (1e-5, 0.1),  # d_P (according to Imperial College report)
     (0, 0.2),  # epsilon_I
     (0.65, 0.9),  # rho
-    (0, 0),  # omega
+    (0, 1),  # omega
     (1 / 7.5, 1 / 6.5),  # sigma
     # (1, 1e2),  # Hyper-parameter 1: weighting for positive cases
     # (1, 1e2),  # Hyper-parameter 2: weighting for deaths
@@ -935,7 +897,6 @@ result_seirpdq = optimize.differential_evolution(
     # seirpdq_least_squares_error_ode,
     seirpdq_least_squares_error_ode_y0,
     bounds=bounds_seirpdq,
-    # args=(data_time, [infected_individuals, dead_individuals], seirpdq_ode_solver, y0_seirpdq),
     args=(
         data_time,
         [infected_individuals, dead_individuals, confirmed_cases, recovered_cases],
@@ -1050,22 +1011,22 @@ print(df_parameters_calibrated.to_latex(index=False))
 # %%
 plt.figure(figsize=(9, 7))
 
-# plt.plot(
-#     t_computed_seirpdq,
-#     I_seirpdq,
-#     label="Infected (SEAIRPD-Q)",
-#     marker="X",
-#     linestyle="-",
-#     markersize=10,
-# )
-# plt.plot(
-#     t_computed_seirpdq,
-#     A_seirpdq,
-#     label="Asymptomatic (SEAIRPD-Q)",
-#     marker="o",
-#     linestyle="-",
-#     markersize=10,
-# )
+plt.plot(
+    t_computed_seirpdq,
+    I_seirpdq,
+    label="Infected (SEAIRPD-Q)",
+    marker="X",
+    linestyle="-",
+    markersize=10,
+)
+plt.plot(
+    t_computed_seirpdq,
+    A_seirpdq,
+    label="Asymptomatic (SEAIRPD-Q)",
+    marker="o",
+    linestyle="-",
+    markersize=10,
+)
 # plt.plot(t_computed_seirdq, R_seirdq * target_population, label='Recovered (SEIRDAQ)', marker='o', linestyle="-", markersize=10)
 plt.plot(
     t_computed_seirpdq,
@@ -1098,7 +1059,6 @@ plt.ylabel("Population")
 plt.tight_layout()
 plt.savefig("seirpdq_deterministic_calibration.png")
 plt.show()
-
 
 # %%
 plt.figure(figsize=(9, 7))
@@ -1216,7 +1176,7 @@ t_computed_predict_seirpdq, y_computed_predict_seirpdq = (
 # %%
 has_to_plot_infection_peak = True
 
-crisis_day_seirpdq = np.argmax(P_predict_seirpdq)
+crisis_day_seirpdq = np.argmax(P_predict_seirpdq) + 1
 
 
 # %%
@@ -1224,22 +1184,22 @@ plt.figure(figsize=(9, 7))
 
 #     plt.plot(t_computed_predict_seirdaq, 100 * S_predict_seirdq, label='Susceptible (SEIRD-Q)', marker='s', linestyle="-", markersize=10)
 # plt.plot(t_computed_predict_seirpdq, E_predict_seirpdq, label='Exposed (SEIRPD-Q)', marker='*', linestyle="-", markersize=10)
-# plt.plot(
-#     t_computed_predict_seirpdq,
-#     I_predict_seirpdq,
-#     label="Infected (SEAIRPD-Q)",
-#     marker="X",
-#     linestyle="-",
-#     markersize=10,
-# )
-# plt.plot(
-#     t_computed_predict_seirpdq,
-#     A_predict_seirpdq,
-#     label="Asymptomatic (SEAIRPD-Q)",
-#     marker="o",
-#     linestyle="-",
-#     markersize=10,
-# )
+plt.plot(
+    t_computed_predict_seirpdq,
+    I_predict_seirpdq,
+    label="Infected (SEAIRPD-Q)",
+    marker="X",
+    linestyle="-",
+    markersize=10,
+)
+plt.plot(
+    t_computed_predict_seirpdq,
+    A_predict_seirpdq,
+    label="Asymptomatic (SEAIRPD-Q)",
+    marker="o",
+    linestyle="-",
+    markersize=10,
+)
 #     plt.plot(t_computed_predict_seirdaq, 100 * R_predict_seirdaq, label='Recovered (SEIRDAQ)', marker='o', linestyle="-", markersize=10)
 plt.plot(
     t_computed_predict_seirpdq,

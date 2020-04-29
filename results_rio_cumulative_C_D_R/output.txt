@@ -1,0 +1,38 @@
+     fun: 9264.90421727996
+ message: 'Optimization terminated successfully.'
+    nfev: 120435
+     nit: 285
+ success: True
+       x: array([3.15567819e-07, 4.26795302e-11, 5.40298730e-02, 4.76196401e-02,
+       4.94794183e-02, 4.49654719e-03, 1.00515851e-05, 6.40519657e-02,
+       6.51309427e-01, 4.38149241e-02, 1.42896005e-01, 1.04001133e+00,
+       2.75488568e+00, 2.91948626e+01])
+-- Initial conditions: (6718868.0, 1, 2, 29, 4, 0, 0, 4, 0)
+\begin{tabular}{lrrrrrrrrrrr}
+\toprule
+     Model &       \$\textbackslash beta\$ &         \$\textbackslash mu\$ &  \$\textbackslash gamma\_I\$ &  \$\textbackslash gamma\_A\$ &  \$\textbackslash gamma\_P\$ &     \$d\_I\$ &    \$d\_P\$ &  \$\textbackslash epsilon\_I\$ &    \$\textbackslash rho\$ &  \$\textbackslash omega\$ &  \$\textbackslash sigma\$ \\
+\midrule
+ SEAIRPD-Q &  3.155678e-07 &  4.267953e-11 &     0.05403 &     0.04762 &    0.049479 &  0.004497 &  0.00001 &      0.064052 &  0.651309 &  0.043815 &  0.142896 \\
+\bottomrule
+\end{tabular}
+
+-- Confirmed cases estimate for today (SEIRPD-Q):       2251
+-- Confirmed cases estimate population percentage for today (SEIRPD-Q): 0.034%
+-- Death estimate for today (SEIRPD-Q): 274
+-- Death estimate population percentage for today (SEIRPD-Q):   0.004%
+-- Recorded deaths until today: 322
+\begin{tabular}{lr}
+\toprule
+   Method &  Deaths estimate \\
+\midrule
+ SEIRPD-Q &              274 \\
+ Recorded &              322 \\
+\bottomrule
+\end{tabular}
+
+-- Max number of diagnosed individuals (SEIRPD-Q model):         2584
+-- Population percentage of max number of diagnosed individuals (SEIRPD-Q model):        0.04%
+-- Day estimate for max number of diagnosed individuals (SEIRPD-Q model):        60
+-- Percentage of number of death estimate (SEIRPD-Q model):      0.008%
+-- Number of death estimate (SEIRPD-Q model):    519
+-- Reproduction number (R0):     6.607

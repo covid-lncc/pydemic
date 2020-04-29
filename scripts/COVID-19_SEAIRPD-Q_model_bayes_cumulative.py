@@ -565,6 +565,7 @@ df_population
 # %%
 brazil_population = float(df_population[df_population.Country == "Brazil "].Population)
 brazil_population = float(210147125)
+rio_population = float(6718903)  # gathered from IBGE 2019
 italy_population = float(df_population[df_population.Country == "Italy "].Population)
 china_population = float(df_population[df_population.Country == "China "].Population)
 hubei_population = float(58500000)  # from wikipedia!
@@ -572,7 +573,7 @@ spain_population = float(df_population[df_population.Country == "Spain "].Popula
 iran_population = float(df_population[df_population.Country == "Iran "].Population)
 us_population = float(df_population[df_population.Country == "United States "].Population)
 
-target_population = brazil_population
+target_population = rio_population
 target_population
 
 # %% [markdown]
@@ -593,7 +594,7 @@ df_rio_cases_by_day["active"] = (
 rio_columns_rename = {"cases": "confirmed", "recoveries": "recovered"}
 df_rio_cases_by_day.rename(columns=rio_columns_rename, inplace=True)
 
-df_target_country = df_brazil_cases_by_day
+df_target_country = df_rio_cases_by_day
 E0, A0, I0, P0, R0, D0, C0, H0 = (
     int(5 * float(df_target_country.confirmed[0])),
     int(1.8 * float(df_target_country.confirmed[0])),
@@ -638,8 +639,8 @@ def seirpdq_model(
     SEIRPD-Q python implementation.
     """
     S, E, A, I, P, R, D, C, H = X
-    beta = beta0 * np.exp(-beta1 * t)
-    mu = mu0 * np.exp(-mu1 * t)
+    beta = beta0  # * np.exp(-beta1 * t)
+    mu = mu0  # * np.exp(-mu1 * t)
     S_prime = -beta / N * S * I - mu / N * S * A - omega * S + eta * R
     E_prime = beta / N * S * I + mu / N * S * A - sigma * E - omega * E
     A_prime = sigma * (1 - rho) * E - gamma_A * A - omega * A
@@ -807,13 +808,13 @@ bounds_seirpdq = [
     (1 / 21, 1 / 14),  # gamma_P
     (1e-5, 0.1),  # d_I
     (1e-5, 0.1),  # d_P (according to Imperial College report)
-    (0, 0.2),  # epsilon_I
+    (1 / 15, 1 / 7),  # epsilon_I
     (0.65, 0.9),  # rho
     (0, 1),  # omega
     (1 / 7.5, 1 / 6.5),  # sigma
-    (1, 5 * P0),  # E0
-    (1, 5 * P0),  # A0
-    (1, 20 * P0),  # I0
+    (P0, 10 * P0),  # E0
+    (1, 1 * P0),  # A0
+    (P0, 5 * P0),  # I0
 ]
 y0_seirpdq_known = S0, P0, R0, D0, C0, H0
 # bounds_seirdaq = [(0, 1e-2), (0, 1), (0, 1), (0, 0.2), (0, 0.2), (0, 0.2)]
@@ -830,9 +831,9 @@ result_seirpdq = optimize.differential_evolution(
         y0_seirpdq_known,
         target_population,
     ),
-    popsize=30,
+    popsize=20,
     strategy="best1bin",
-    tol=1e-5,
+    tol=5e-5,
     recombination=0.95,
     mutation=0.6,
     maxiter=10000,
@@ -840,7 +841,7 @@ result_seirpdq = optimize.differential_evolution(
     disp=True,
     seed=seed,
     callback=callback_de,
-    workers=-1,
+    workers=16,
 )
 
 print(result_seirpdq)
@@ -1341,7 +1342,7 @@ def seirpdq_ode_wrapper_with_y0(
 
 
 # %%
-percent_calibration = 0.95
+percent_calibration = 0.5
 with pm.Model() as model_mcmc:
     # Prior distributions for the model's parameters
     beta = pm.Uniform(
@@ -1379,11 +1380,12 @@ with pm.Model() as model_mcmc:
         lower=(1 - percent_calibration) * d_D_deterministic,
         upper=(1 + percent_calibration) * d_D_deterministic,
     )
-    epsilon_I = pm.Uniform(
-        "epsilon_I",
-        lower=(1 - percent_calibration) * epsilon_I_deterministic,
-        upper=(1 + percent_calibration) * epsilon_I_deterministic,
-    )
+    # epsilon_I = pm.Uniform(
+    #     "epsilon_I",
+    #     lower=(1 - percent_calibration) * epsilon_I_deterministic,
+    #     upper=(1 + percent_calibration) * epsilon_I_deterministic,
+    # )
+    epsilon_I = pm.Uniform("epsilon_I", lower=1 / 15, upper=1 / 7,)
     # rho = pm.Uniform('rho', lower=(1 - percent_calibration) * rho_deterministic, upper=(1 + percent_calibration) * rho_deterministic)
     rho = pm.Uniform("rho", lower=0.65, upper=0.9)
     omega = pm.Uniform(
@@ -1391,11 +1393,12 @@ with pm.Model() as model_mcmc:
         lower=(1 - percent_calibration) * omega_deterministic,
         upper=(1 + percent_calibration) * omega_deterministic,
     )
-    sigma = pm.Uniform(
-        "sigma",
-        lower=(1 - percent_calibration) * sigma_deterministic,
-        upper=(1 + percent_calibration) * sigma_deterministic,
-    )
+    # sigma = pm.Uniform(
+    #     "sigma",
+    #     lower=(1 - percent_calibration) * sigma_deterministic,
+    #     upper=(1 + percent_calibration) * sigma_deterministic,
+    # )
+    sigma = pm.Uniform("sigma", lower=1 / 7.5, upper=1 / 6.5,)
     # eta = pm.Uniform('eta', lower=(1 - percent_calibration) * eta_deterministic, upper=(1 + percent_calibration) * eta_deterministic)
     E0_uncertain = pm.Uniform(
         "E0", lower=(1 - percent_calibration) * E0, upper=(1 + percent_calibration) * E0
@@ -1406,7 +1409,7 @@ with pm.Model() as model_mcmc:
     I0_uncertain = pm.Uniform(
         "I0", lower=(1 - percent_calibration) * I0, upper=(1 + percent_calibration) * I0
     )
-    standard_deviation = pm.Uniform("std_deviation", lower=5e2, upper=1.5e3)
+    standard_deviation = pm.Uniform("std_deviation", lower=5e2, upper=7e2)
 
     # Defining the deterministic formulation of the problem
     fitting_model = pm.Deterministic(
@@ -1439,7 +1442,7 @@ with pm.Model() as model_mcmc:
     # The Monte Carlo procedure driver
     step = pm.step_methods.DEMetropolis()
     seirdpq_trace_calibration = pm.sample(
-        65000, chains=8, cores=8, step=step, random_seed=seed, tune=25000
+        45000, chains=8, cores=8, step=step, random_seed=seed, tune=35000
     )
 
 

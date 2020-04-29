@@ -42,7 +42,7 @@ import pandas as pd  # data processing, CSV file I/O (e.g. pd.read_csv)
 import pymc3 as pm  # for uncertainty quantification and model calibration
 import theano  # to control better pymc3 backend and write a wrapper
 import theano.tensor as t  # for the wrapper to a custom model to pymc3
-from numba import jit  # to accelerate ODE system RHS evaluations
+from numba import jit, vectorize  # to accelerate ODE system RHS evaluations
 from scipy import optimize  # to solve minimization problem from least-squares fitting
 from scipy.integrate import solve_ivp  # to solve ODE system
 from tqdm import trange
@@ -616,6 +616,16 @@ y0_seirpdq = S0, E0, A0, I0, P0, R0, D0, C0, H0  # SEIRPDQ IC array (not fully u
 
 # %%
 @jit(nopython=True)
+def smooth_activation(t, value, t_on, t_off, smoothing_factor_on=1, smoothing_factor_off=1):
+    delta_t_on = t - t_on
+    delta_t_off = t - t_off
+    activation_transition = np.tanh(delta_t_on * smoothing_factor_on)
+    deactivation_transition = np.tanh(delta_t_off * smoothing_factor_off)
+    activation = value / 2 * (activation_transition - deactivation_transition)
+    return activation
+
+
+@jit(nopython=True)
 def seirpdq_model(
     t,
     X,
@@ -633,14 +643,32 @@ def seirpdq_model(
     rho=0.1,
     eta=2e-2,
     sigma=1 / 7,
+    # omega_on=9,
+    # omega_off=19,
+    # eta_on=150,
+    # eta_off=155,
     N=1,
 ):
     """
     SEIRPD-Q python implementation.
     """
     S, E, A, I, P, R, D, C, H = X
-    beta = beta0 * np.exp(-beta1 * t)
-    mu = mu0 * np.exp(-mu1 * t)
+    beta = beta0  # * np.exp(-beta1 * t)
+    mu = mu0  # * np.exp(-mu1 * t)
+    omega_on = 9
+    omega_off = 19
+    omega = smooth_activation(t, omega, t_on=omega_on, t_off=omega_off)
+
+    # if 1 <= t <= 29:
+    #     omega = smooth_activation(t, omega, t_on=9, t_off=19)
+    # elif 155 <= t <= 185:
+    #     omega = smooth_activation(t, 0.85, t_on=175, t_off=185)
+    # else:
+    #     omega = 0
+
+    # eta = smooth_activation(t, eta, t_on=eta_on, t_off=eta_off)
+    # if 145 <= t <= 165:
+    #     eta = smooth_activation(t, 0.95, t_on=150, t_off=155)
     S_prime = -beta / N * S * I - mu / N * S * A - omega * S + eta * R
     E_prime = beta / N * S * I + mu / N * S * A - sigma * E - omega * E
     A_prime = sigma * (1 - rho) * E - gamma_A * A - omega * A
@@ -700,7 +728,7 @@ def seirpdq_ode_solver(
         t_span=t_span,
         y0=y0,
         t_eval=t_eval,
-        method="LSODA",
+        method="Radau",
     )
 
     return solution_ODE
@@ -878,7 +906,7 @@ bounds_seirpdq = [
     (1 / 21, 1 / 14),  # gamma_P
     (1e-5, 0.1),  # d_I
     (1e-5, 0.1),  # d_P (according to Imperial College report)
-    (0, 0.2),  # epsilon_I
+    (1 / 15, 1 / 7),  # epsilon_I
     (0.65, 0.9),  # rho
     (0, 1),  # omega
     (1 / 7.5, 1 / 6.5),  # sigma
@@ -886,9 +914,9 @@ bounds_seirpdq = [
     # (1, 1e2),  # Hyper-parameter 2: weighting for deaths
     # (1, 1e2),  # Hyper-parameter 3: weighting for cumulative cases
     # (1, 1e2),  # Hyper-parameter 4: weighting for recovered cases
-    (1, 5 * P0),  # E0
-    (1, 5 * P0),  # A0
-    (1, 20 * P0),  # I0
+    (P0, 10 * P0),  # E0
+    (1, 1 * P0),  # A0
+    (P0, 5 * P0),  # I0
 ]
 y0_seirpdq_known = S0, P0, R0, D0, C0, H0
 # bounds_seirdaq = [(0, 1e-2), (0, 1), (0, 1), (0, 0.2), (0, 0.2), (0, 0.2)]
@@ -904,9 +932,9 @@ result_seirpdq = optimize.differential_evolution(
         y0_seirpdq_known,
         target_population,
     ),
-    popsize=30,
+    popsize=20,
     strategy="best1bin",
-    tol=1e-5,
+    tol=5e-5,
     recombination=0.95,
     mutation=0.6,
     maxiter=10000,
@@ -914,7 +942,7 @@ result_seirpdq = optimize.differential_evolution(
     disp=True,
     seed=seed,
     callback=callback_de,
-    workers=-1,
+    workers=40,
 )
 
 print(result_seirpdq)
@@ -1011,22 +1039,22 @@ print(df_parameters_calibrated.to_latex(index=False))
 # %%
 plt.figure(figsize=(9, 7))
 
-plt.plot(
-    t_computed_seirpdq,
-    I_seirpdq,
-    label="Infected (SEAIRPD-Q)",
-    marker="X",
-    linestyle="-",
-    markersize=10,
-)
-plt.plot(
-    t_computed_seirpdq,
-    A_seirpdq,
-    label="Asymptomatic (SEAIRPD-Q)",
-    marker="o",
-    linestyle="-",
-    markersize=10,
-)
+# plt.plot(
+#     t_computed_seirpdq,
+#     I_seirpdq,
+#     label="Infected (SEAIRPD-Q)",
+#     marker="X",
+#     linestyle="-",
+#     markersize=10,
+# )
+# plt.plot(
+#     t_computed_seirpdq,
+#     A_seirpdq,
+#     label="Asymptomatic (SEAIRPD-Q)",
+#     marker="o",
+#     linestyle="-",
+#     markersize=10,
+# )
 # plt.plot(t_computed_seirdq, R_seirdq * target_population, label='Recovered (SEIRDAQ)', marker='o', linestyle="-", markersize=10)
 plt.plot(
     t_computed_seirpdq,
@@ -1146,7 +1174,7 @@ print(df_deaths_estimates.to_latex(index=False))
 
 # %%
 t0 = float(data_time.min())
-number_of_days_after_last_record = 120
+number_of_days_after_last_record = 150  # 5 months ahead
 tf = data_time.max() + number_of_days_after_last_record
 time_range = np.linspace(t0, tf, int(tf - t0) + 1)
 

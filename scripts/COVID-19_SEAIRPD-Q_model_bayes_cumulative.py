@@ -45,7 +45,7 @@ import theano.tensor as t  # for the wrapper to a custom model to pymc3
 from numba import jit  # to accelerate ODE system RHS evaluations
 from scipy import optimize  # to solve minimization problem from least-squares fitting
 from scipy.integrate import solve_ivp  # to solve ODE system
-from tqdm import trange
+from tqdm import tqdm, trange
 
 seed = 12345  # for the sake of reproducibility :)
 np.random.seed(seed)
@@ -595,6 +595,7 @@ rio_columns_rename = {"cases": "confirmed", "recoveries": "recovered"}
 df_rio_cases_by_day.rename(columns=rio_columns_rename, inplace=True)
 
 df_target_country = df_rio_cases_by_day
+
 E0, A0, I0, P0, R0, D0, C0, H0 = (
     int(5 * float(df_target_country.confirmed[0])),
     int(1.8 * float(df_target_country.confirmed[0])),
@@ -758,8 +759,8 @@ def seirpdq_least_squares_error_ode_y0(
         ) = simulated_ode_solution
 
         residual1 = f_exp1 - simulated_qoi1
-        residual2 = f_exp2 - simulated_qoi2
-        residual3 = f_exp3 - simulated_qoi3
+        residual2 = f_exp2 - simulated_qoi2  # Deaths
+        residual3 = f_exp3 - simulated_qoi3  # Cases
         residual4 = f_exp4 - simulated_qoi4
 
         first_term = weighting_for_exp1_constraints * np.sum(residual1 ** 2.0)
@@ -1342,7 +1343,7 @@ def seirpdq_ode_wrapper_with_y0(
 
 
 # %%
-percent_calibration = 0.5
+percent_calibration = 0.75
 with pm.Model() as model_mcmc:
     # Prior distributions for the model's parameters
     beta = pm.Uniform(
@@ -1409,7 +1410,7 @@ with pm.Model() as model_mcmc:
     I0_uncertain = pm.Uniform(
         "I0", lower=(1 - percent_calibration) * I0, upper=(1 + percent_calibration) * I0
     )
-    standard_deviation = pm.Uniform("std_deviation", lower=5e2, upper=7e2)
+    standard_deviation = pm.Uniform("std_deviation", lower=3e2, upper=7e2)
 
     # Defining the deterministic formulation of the problem
     fitting_model = pm.Deterministic(
@@ -1440,183 +1441,59 @@ with pm.Model() as model_mcmc:
     )
 
     # The Monte Carlo procedure driver
-    step = pm.step_methods.DEMetropolis()
-    seirdpq_trace_calibration = pm.sample(
-        45000, chains=8, cores=8, step=step, random_seed=seed, tune=35000
+    # step = pm.step_methods.DEMetropolis()
+    # seirdpq_trace_calibration = pm.sample(
+    #     50000, chains=8, cores=8, step=step, random_seed=seed, tune=35000
+    # )
+    # seirdpq_trace_calibration = pm.sample(
+    #     50000, step=step, random_seed=seed, tune=35000
+    # )
+    seirdpq_trace_calibration = pm.sample(4000, random_seed=seed, tune=1000)
+
+
+# %%
+print("\n*** Performing Bayesian calibration Arviz post-processing ***")
+import warnings
+
+warnings.filterwarnings("ignore")
+
+start_time = time.time()
+plot_step = 10
+
+
+# %%
+calibration_variable_names = [
+    "std_deviation",
+    "beta",
+    "mu",
+    "gamma_I",
+    "gamma_A",
+    "gamma_P",
+    "d_I",
+    "d_P",
+    "epsilon_I",
+    "rho",
+    "omega",
+    "sigma",
+    "E0",
+    "A0",
+    "I0",
+]
+
+progress_bar = tqdm(calibration_variable_names)
+for variable in progress_bar:
+    progress_bar.set_description("Arviz post-processing")
+    pm.traceplot(seirdpq_trace_calibration[::plot_step], var_names=(f"{variable}"))
+    plt.savefig(f"seirpdq_{variable}_traceplot_cal.png")
+
+    pm.plot_posterior(
+        seirdpq_trace_calibration[::plot_step], var_names=(f"{variable}"), kind="hist", round_to=5
     )
+    plt.savefig(f"seirpdq_{variable}_posterior_cal.png")
 
 
 # %%
-plot_step = 100
-
-
-# %%
-pm.traceplot(seirdpq_trace_calibration[::plot_step], var_names=("beta"))
-plt.savefig("seirpdq_beta_traceplot_cal.png")
-plt.show()
-
-pm.traceplot(seirdpq_trace_calibration[::plot_step], var_names=("mu"))
-plt.savefig("seirpdq_mu_traceplot_cal.png")
-plt.show()
-
-pm.traceplot(seirdpq_trace_calibration[::plot_step], var_names=("gamma_I"))
-plt.savefig("seirpdq_gamma_I_traceplot_cal.png")
-plt.show()
-
-pm.traceplot(seirdpq_trace_calibration[::plot_step], var_names=("gamma_A"))
-plt.savefig("seirpdq_gamma_A_traceplot_cal.png")
-plt.show()
-
-pm.traceplot(seirdpq_trace_calibration[::plot_step], var_names=("gamma_P"))
-plt.savefig("seirpdq_gamma_P_traceplot_cal.png")
-plt.show()
-
-pm.traceplot(seirdpq_trace_calibration[::plot_step], var_names=("d_I"))
-plt.savefig("seirpdq_d_I_traceplot_cal.png")
-plt.show()
-
-pm.traceplot(seirdpq_trace_calibration[::plot_step], var_names=("d_P"))
-plt.savefig("seirpdq_d_D_traceplot_cal.png")
-plt.show()
-
-pm.traceplot(seirdpq_trace_calibration[::plot_step], var_names=("epsilon_I"))
-plt.savefig("seirpdq_epsilon_I_traceplot_cal.png")
-plt.show()
-
-pm.traceplot(seirdpq_trace_calibration[::plot_step], var_names=("rho"))
-plt.savefig("seirpdq_rho_traceplot_cal.png")
-plt.show()
-
-pm.traceplot(seirdpq_trace_calibration[::plot_step], var_names=("omega"))
-plt.savefig("seirpdq_omega_traceplot_cal.png")
-plt.show()
-
-pm.traceplot(seirdpq_trace_calibration[::plot_step], var_names=("sigma"))
-plt.savefig("seirpdq_sigma_traceplot_cal.png")
-plt.show()
-
-pm.traceplot(seirdpq_trace_calibration[::plot_step], var_names=("E0"))
-plt.savefig("seirpdq_E0_traceplot_cal.png")
-plt.show()
-
-pm.traceplot(seirdpq_trace_calibration[::plot_step], var_names=("A0"))
-plt.savefig("seirpdq_A0_traceplot_cal.png")
-plt.show()
-
-pm.traceplot(seirdpq_trace_calibration[::plot_step], var_names=("I0"))
-plt.savefig("seirpdq_I0_traceplot_cal.png")
-plt.show()
-
-pm.traceplot(seirdpq_trace_calibration[::plot_step], var_names=("std_deviation"))
-plt.savefig("seirpdq_SD_traceplot_cal.png")
-plt.show()
-
-# pm.traceplot(seirdpq_trace_calibration[::plot_step], var_names=('omega'))
-# plt.savefig('seirpdq_omega_traceplot_cal.png')
-# plt.show()
-
-
-# %%
-# pm.plot_posterior(seirdpq_trace_calibration[::plot_step], var_names=('beta'), kind='hist', round_to=5)
-# plt.savefig('seirpdq_beta_posterior_cal.png')
-# plt.show()
-
-# pm.plot_posterior(seirdpq_trace_calibration[::plot_step], var_names=('gamma'), kind='hist', round_to=5)
-# plt.savefig('seirpdq_gamma_posterior_cal.png')
-# plt.show()
-
-# pm.plot_posterior(seirdpq_trace_calibration[::plot_step], var_names=('delta'), kind='hist', round_to=5)
-# plt.savefig('seirpdq_delta_posterior_cal.png')
-# plt.show()
-
-# pm.plot_posterior(seirdpq_trace_calibration[::plot_step], var_names=('omega'), kind='hist', round_to=3)
-# plt.savefig('seirpdq_omega_posterior_cal.png')
-# plt.show()
-
-pm.plot_posterior(
-    seirdpq_trace_calibration[::plot_step], var_names=("beta"), kind="hist", round_to=5
-)
-plt.savefig("seirpdq_beta_posterior_cal.png")
-plt.show()
-
-pm.plot_posterior(seirdpq_trace_calibration[::plot_step], var_names=("mu"), kind="hist", round_to=5)
-plt.savefig("seirpdq_mu_posterior_cal.png")
-plt.show()
-
-pm.plot_posterior(
-    seirdpq_trace_calibration[::plot_step], var_names=("gamma_I"), kind="hist", round_to=5
-)
-plt.savefig("seirpdq_gamma_I_posterior_cal.png")
-plt.show()
-
-pm.plot_posterior(
-    seirdpq_trace_calibration[::plot_step], var_names=("gamma_A"), kind="hist", round_to=5
-)
-plt.savefig("seirpdq_gamma_A_posterior_cal.png")
-plt.show()
-
-pm.plot_posterior(
-    seirdpq_trace_calibration[::plot_step], var_names=("gamma_P"), kind="hist", round_to=5
-)
-plt.savefig("seirpdq_gamma_P_posterior_cal.png")
-plt.show()
-
-pm.plot_posterior(
-    seirdpq_trace_calibration[::plot_step], var_names=("d_I"), kind="hist", round_to=5
-)
-plt.savefig("seirpdq_d_I_posterior_cal.png")
-plt.show()
-
-pm.plot_posterior(
-    seirdpq_trace_calibration[::plot_step], var_names=("d_P"), kind="hist", round_to=5
-)
-plt.savefig("seirpdq_d_D_posterior_cal.png")
-plt.show()
-
-pm.plot_posterior(
-    seirdpq_trace_calibration[::plot_step], var_names=("epsilon_I"), kind="hist", round_to=5
-)
-plt.savefig("seirpdq_epsilon_I_posterior_cal.png")
-plt.show()
-
-pm.plot_posterior(
-    seirdpq_trace_calibration[::plot_step], var_names=("rho"), kind="hist", round_to=5
-)
-plt.savefig("seirpdq_rho_posterior_cal.png")
-plt.show()
-
-pm.plot_posterior(
-    seirdpq_trace_calibration[::plot_step], var_names=("omega"), kind="hist", round_to=5
-)
-plt.savefig("seirpdq_omega_posterior_cal.png")
-plt.show()
-
-pm.plot_posterior(
-    seirdpq_trace_calibration[::plot_step], var_names=("sigma"), kind="hist", round_to=5
-)
-plt.savefig("seirpdq_sigma_posterior_cal.png")
-plt.show()
-
-pm.plot_posterior(seirdpq_trace_calibration[::plot_step], var_names=("E0"), kind="hist", round_to=5)
-plt.savefig("seirpdq_E0_posterior_cal.png")
-plt.show()
-
-pm.plot_posterior(seirdpq_trace_calibration[::plot_step], var_names=("A0"), kind="hist", round_to=5)
-plt.savefig("seirpdq_A0_posterior_cal.png")
-plt.show()
-
-pm.plot_posterior(seirdpq_trace_calibration[::plot_step], var_names=("I0"), kind="hist", round_to=5)
-plt.savefig("seirpdq_I0_posterior_cal.png")
-plt.show()
-
-pm.plot_posterior(
-    seirdpq_trace_calibration[::plot_step], var_names=("std_deviation"), kind="hist", round_to=5
-)
-plt.savefig("seirpdq_SD_posterior_cal.png")
-plt.show()
-
-# %%
-percentile_cut = 5
+percentile_cut = 2.5
 
 y_min = np.percentile(seirdpq_trace_calibration["seirpdq_model"], percentile_cut, axis=0)
 y_max = np.percentile(seirdpq_trace_calibration["seirpdq_model"], 100 - percentile_cut, axis=0)
@@ -1627,7 +1504,6 @@ y_fit = np.percentile(seirdpq_trace_calibration["seirpdq_model"], 50, axis=0)
 std_deviation = seirdpq_trace_calibration.get_values("std_deviation")
 sd_pop = np.sqrt(std_deviation.mean())
 print(f"-- Estimated standard deviation mean: {sd_pop}")
-sd_pop
 
 
 # %%
@@ -1660,8 +1536,12 @@ plt.grid()
 plt.tight_layout()
 
 plt.savefig("seirpdq_calibration_bayes.png")
-plt.show()
+# plt.show()
 
+# %%
+duration = time.time() - start_time
+
+print(f"-- Arviz post-processing done in {duration / 60:.3f} minutes")
 # %% [markdown]
 # Now we evaluate prediction. We have to retrieve parameter realizations.
 

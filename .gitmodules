@@ -1,0 +1,3 @@
+[submodule "pydemic/data/covid19br"]
+	path = pydemic/data/covid19br
+	url = https://github.com/wcota/covid19br.git

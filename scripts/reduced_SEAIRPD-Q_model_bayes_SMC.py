@@ -68,9 +68,45 @@ DATA_PATH = os.environ["DATA_DIR"]
 # %%
 brazil_population = float(210147125)
 rio_population = float(6718903)  # gathered from IBGE 2019
+sp_state_population = 44.04e6
+rj_state_population = 16.46e6
+ce_state_population = 8.843e6
 
 target_population = brazil_population
 target_population
+
+# %%
+df_brazil_states_cases = pd.read_csv(
+    f"{DATA_PATH}/covid19br/cases-brazil-states.csv",
+    usecols=["date", "state", "totalCases", "deaths", "recovered"],
+    parse_dates=["date"],
+)
+df_brazil_states_cases.fillna(value={"recovered": 0}, inplace=True)
+df_brazil_states_cases = df_brazil_states_cases[df_brazil_states_cases.state != "TOTAL"]
+
+
+# %%
+def get_brazil_state_dataframe(
+    df_brazil: pd.DataFrame, state_name: str, confirmed_lower_threshold: int = 10
+) -> pd.DataFrame:
+    df_brazil = df_brazil.copy()
+    df_state_cases = df_brazil[df_brazil.state == state_name]
+    df_state_cases.reset_index(inplace=True)
+    columns_rename = {"totalCases": "confirmed"}
+    df_state_cases.rename(columns=columns_rename, inplace=True)
+    df_state_cases["active"] = (
+        df_state_cases["confirmed"] - df_state_cases["deaths"] - df_state_cases["recovered"]
+    )
+
+    df_state_cases = df_state_cases[df_state_cases.confirmed > confirmed_lower_threshold]
+    day_range_list = list(range(len(df_state_cases.confirmed)))
+    df_state_cases["day"] = day_range_list
+    return df_state_cases
+
+
+df_sp_state_cases = get_brazil_state_dataframe(df_brazil_states_cases, state_name="SP")
+df_rj_state_cases = get_brazil_state_dataframe(df_brazil_states_cases, state_name="RJ")
+df_ce_state_cases = get_brazil_state_dataframe(df_brazil_states_cases, state_name="CE")
 
 # %% [markdown]
 # Initial Conditions:
@@ -83,6 +119,7 @@ df_brazil_cases_by_day["day"] = df_brazil_cases_by_day.date.apply(
     lambda x: (x - df_brazil_cases_by_day.date.min()).days
 )
 
+# %%
 df_rio_cases_by_day = pd.read_csv(f"{DATA_PATH}/rio_covid19.csv")
 df_rio_cases_by_day["active"] = (
     df_rio_cases_by_day["cases"] - df_rio_cases_by_day["deaths"] - df_rio_cases_by_day["recoveries"]
@@ -90,17 +127,18 @@ df_rio_cases_by_day["active"] = (
 rio_columns_rename = {"cases": "confirmed", "recoveries": "recovered"}
 df_rio_cases_by_day.rename(columns=rio_columns_rename, inplace=True)
 
+# %%
 df_target_country = df_brazil_cases_by_day
 
 E0, A0, I0, P0, R0, D0, C0, H0 = (
-    int(10 * float(df_target_country.confirmed[0])),
-    int(1 * float(df_target_country.confirmed[0])),
-    int(5 * float(df_target_country.confirmed[0])),
-    int(float(df_target_country.active[0])),
-    int(float(df_target_country.recovered[0])),
-    int(float(df_target_country.deaths[0])),
-    int(float(df_target_country.confirmed[0])),
-    int(float(df_target_country.recovered[0])),
+    int(10 * float(df_target_country.confirmed.values[0])),
+    int(1 * float(df_target_country.confirmed.values[0])),
+    int(5 * float(df_target_country.confirmed.values[0])),
+    int(float(df_target_country.active.values[0])),
+    int(float(df_target_country.recovered.values[0])),
+    int(float(df_target_country.deaths.values[0])),
+    int(float(df_target_country.confirmed.values[0])),
+    int(float(df_target_country.recovered.values[0])),
 )
 
 S0 = target_population - (E0 + A0 + I0 + R0 + P0 + D0)
@@ -161,11 +199,12 @@ def seirpdq_ode_solver(
     beta0=1e-7,
     omega=1 / 10,
     gamma_P=1 / 14,
+    d_I=2e-4,
+    d_P=9e-3,
+    # gamma_P=1 / 14,
     mu0=1e-7,
     gamma_I=1 / 14,
     gamma_A=1 / 14,
-    d_I=2e-4,
-    d_P=9e-3,
     epsilon_I=1 / 7,
     rho=0.75,
     sigma=1 / 7,
@@ -356,6 +395,9 @@ bounds_seirpdq = [
     (0, 1e-5),  # beta
     (0, 1),  # omega
     (1 / 21, 1 / 14),  # gamma_P
+    # (0.1, 1e-5),  # d_I
+    # (0.1, 1e-5),  # d_P
+    # (1 / 21, 1 / 14),  # gamma_P
 ]
 # bounds_seirdaq = [(0, 1e-2), (0, 1), (0, 1), (0, 0.2), (0, 0.2), (0, 0.2)]
 
@@ -388,10 +430,18 @@ print(result_seirpdq)
 print(f"-- Initial conditions: {y0_seirpdq}")
 
 # %%
-(beta_deterministic, omega_deterministic, gamma_P_deterministic,) = result_seirpdq.x
+(
+    beta_deterministic,
+    omega_deterministic,
+    # gamma_P_deterministic,
+    # d_I_deterministic,
+    # d_P_deterministic,
+    gamma_P_deterministic,
+) = result_seirpdq.x
 
 gamma_I_deterministic = 1 / 14
 gamma_A_deterministic = 1 / 14
+# gamma_P_deterministic = 1 / 14
 d_I_deterministic = 2e-4
 d_P_deterministic = 9e-3
 epsilon_I_deterministic = 1 / 7
@@ -770,7 +820,7 @@ print(f"-- Reproduction number (R0):\t {reproduction_number:.3f}")
 # ## Bayesian Calibration
 
 # %%
-observations_to_fit = np.vstack([dead_individuals, confirmed_cases])
+observations_to_fit = np.vstack([dead_individuals, confirmed_cases]).T
 
 
 # %%
@@ -799,21 +849,25 @@ def seirpdq_ode_wrapper(time_exp, initial_conditions, beta, gamma, delta, theta)
         t.dscalar,  # beta
         t.dscalar,  # omega
         t.dscalar,  # gamma_P
+        # t.dscalar,  # d_I
+        # t.dscalar,  # d_P
+        # t.dscalar,  # gamma_P
     ],
     otypes=[t.dmatrix],
 )
 def seirpdq_ode_wrapper_with_y0(
-    time_exp, initial_conditions, total_population, beta, omega, gamma_P,
+    time_exp, initial_conditions, total_population, beta, omega, gamma_P
 ):
     time_span = (time_exp.min(), time_exp.max())
 
+    # args = [beta, omega, d_I, d_P]
     args = [beta, omega, gamma_P]
     y_model = seirpdq_ode_solver(initial_conditions, time_span, time_exp, *args)
     simulated_time = y_model.t
     simulated_ode_solution = y_model.y
     (_, _, _, _, _, _, simulated_qoi1, simulated_qoi2, _,) = simulated_ode_solution
 
-    concatenate_simulated_qoi = np.vstack([simulated_qoi1, simulated_qoi2])
+    concatenate_simulated_qoi = np.vstack([simulated_qoi1, simulated_qoi2]).T
 
     return concatenate_simulated_qoi
 
@@ -829,8 +883,10 @@ with pm.Model() as model_mcmc:
     beta = pm.Uniform("beta", lower=0, upper=1e-5,)
     omega = pm.Uniform("omega", lower=0, upper=1,)
     gamma_P = pm.Uniform("gamma_P", lower=1 / 21, upper=1 / 14,)
+    # d_I = pm.Uniform("d_I", lower=1e-5, upper=0.1,)
+    # d_P = pm.Uniform("d_P", lower=1e-5, upper=0.1,)
 
-    standard_deviation = pm.Uniform("std_deviation", lower=1e1, upper=1e4)
+    standard_deviation = pm.Uniform("std_deviation", lower=1e0, upper=1e4, shape=2)
 
     # Defining the deterministic formulation of the problem
     fitting_model = pm.Deterministic(
@@ -842,6 +898,8 @@ with pm.Model() as model_mcmc:
             beta,
             omega,
             gamma_P,
+            # d_I,
+            # d_P
         ),
     )
 
@@ -854,6 +912,7 @@ with pm.Model() as model_mcmc:
             gamma_I_deterministic,
             gamma_A_deterministic,
             d_I_deterministic,
+            # d_I,
             epsilon_I_deterministic,
             rho_deterministic,
             omega,
@@ -889,6 +948,8 @@ calibration_variable_names = [
     "beta",
     "gamma_P",
     "omega",
+    # "d_I",
+    # "d_P",
     "R0",
 ]
 
@@ -930,14 +991,20 @@ print(f"-- Estimated standard deviation mean: {sd_pop}")
 plt.figure(figsize=(9, 7))
 
 plt.plot(
-    data_time, y_fit[0], "r", label="Deaths (SEAIRPD-Q)", marker="D", linestyle="-", markersize=10,
+    data_time,
+    y_fit[:, 0],
+    "r",
+    label="Deaths (SEAIRPD-Q)",
+    marker="D",
+    linestyle="-",
+    markersize=10,
 )
-plt.fill_between(data_time, y_min[0], y_max[0], color="r", alpha=0.2)
+plt.fill_between(data_time, y_min[:, 0], y_max[:, 0], color="r", alpha=0.2)
 
 plt.plot(
-    data_time, y_fit[1], "b", label="Cases (SEAIRPD-Q)", marker="v", linestyle="-", markersize=10
+    data_time, y_fit[:, 1], "b", label="Cases (SEAIRPD-Q)", marker="v", linestyle="-", markersize=10
 )
-plt.fill_between(data_time, y_min[1], y_max[1], color="b", alpha=0.2)
+plt.fill_between(data_time, y_min[:, 1], y_max[:, 1], color="b", alpha=0.2)
 
 # plt.errorbar(data_time, infected_individuals, yerr=sd_pop, label='Recorded diagnosed', linestyle='None', marker='s', markersize=10)
 # plt.errorbar(data_time, dead_individuals, yerr=sd_pop, label='Recorded deaths', marker='v', linestyle="None", markersize=10)
@@ -972,7 +1039,7 @@ print("-- Exporting calibrated parameter to CSV")
 start_time = time.time()
 
 dict_realizations = dict()
-progress_bar = tqdm(calibration_variable_names)
+progress_bar = tqdm(calibration_variable_names[1:])
 for variable in progress_bar:
     progress_bar.set_description(f"Gathering {variable} realizations")
     parameter_realization = seirdpq_trace_calibration.get_values(f"{variable}")
@@ -1002,6 +1069,8 @@ for realization in trange(number_of_total_realizations):
         dict_realizations["beta"][realization],
         dict_realizations["omega"][realization],
         dict_realizations["gamma_P"][realization],
+        # dict_realizations["d_I"][realization],
+        # dict_realizations["d_P"][realization],
     ]
     solution_ODE_predict = seirpdq_ode_solver(
         y0_seirpdq, (t0, tf), time_range, *parameters_realization
@@ -1123,7 +1192,7 @@ plt.plot(
     t_computed_predict,
     A_mean,
     "m",
-    label="Cases (SEAIRPD-Q)",
+    label="Asymptomatic (SEAIRPD-Q)",
     marker="o",
     linestyle="-",
     markersize=10,

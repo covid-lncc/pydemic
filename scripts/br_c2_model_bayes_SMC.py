@@ -58,7 +58,8 @@ THEANO_FLAGS = "optimizer=fast_compile"  # A theano trick
 
 Numba.enable_numba()  # speed-up arviz plots
 
-DATA_PATH = os.environ["DATA_DIR"]
+# DATA_PATH = os.environ["DATA_DIR"]
+DATA_PATH = "../pydemic/data/"
 
 # %% [markdown]
 # <a id="loading"></a>
@@ -421,7 +422,7 @@ result_seirpdq = optimize.differential_evolution(
     disp=True,
     seed=seed,
     callback=callback_de,
-    workers=16,
+    workers=-1,
 )
 
 print(result_seirpdq)
@@ -493,17 +494,17 @@ t_computed_seirpdq, y_computed_seirpdq = solution_ODE_seirpdq.t, solution_ODE_se
 # %%
 parameters_dict = {
     "Model": "SEAIRPD-Q",
-    r"$beta$": beta_deterministic,
-    r"$mu$": beta_deterministic,
-    r"$gamma_I$": gamma_I_deterministic,
-    r"$gamma_A$": gamma_A_deterministic,
-    r"$gamma_P$": gamma_P_deterministic,
-    r"$d_I$": d_I_deterministic,
-    r"$d_P$": d_P_deterministic,
-    r"$epsilon_I$": epsilon_I_deterministic,
-    r"$rho$": rho_deterministic,
-    r"$omega$": omega_deterministic,
-    r"$sigma$": sigma_deterministic,
+    u"$beta$": beta_deterministic,
+    u"$mu$": beta_deterministic,
+    u"$gamma_I$": gamma_I_deterministic,
+    u"$gamma_A$": gamma_A_deterministic,
+    u"$gamma_P$": gamma_P_deterministic,
+    u"$d_I$": d_I_deterministic,
+    u"$d_P$": d_P_deterministic,
+    u"$epsilon_I$": epsilon_I_deterministic,
+    u"$rho$": rho_deterministic,
+    u"$omega$": omega_deterministic,
+    u"$sigma$": sigma_deterministic,
 }
 
 df_parameters_calibrated = pd.DataFrame.from_records([parameters_dict])
@@ -881,13 +882,21 @@ start_time = time.time()
 percent_calibration = 0.95
 with pm.Model() as model_mcmc:
     # Prior distributions for the model's parameters
-    beta = pm.Uniform("beta", lower=0, upper=1e-5,)
-    omega = pm.Uniform("omega", lower=0, upper=1,)
+    beta = pm.Uniform(
+        "beta", 
+        lower=(1 - percent_calibration) * beta_deterministic, 
+        upper=(1 + percent_calibration) * beta_deterministic,
+    )
+    omega = pm.Uniform(
+        "omega", 
+        lower=(1 - percent_calibration) * omega_deterministic, 
+        upper=(1 + percent_calibration) * omega_deterministic,
+    )
     gamma_P = pm.Uniform(
         "gamma_P", 
         lower=(1 - percent_calibration) * gamma_P_deterministic, 
         upper=(1 + percent_calibration) * gamma_P_deterministic,
-        )
+    )
     # d_I = pm.Uniform("d_I", lower=1e-5, upper=0.1,)
     # d_P = pm.Uniform("d_P", lower=1e-5, upper=0.1,)
 
@@ -930,7 +939,7 @@ with pm.Model() as model_mcmc:
     )
 
     seirdpq_trace_calibration = pm.sample_smc(
-        draws=draws, n_steps=25, parallel=True, cores=4, progressbar=True, random_seed=seed
+        draws=draws, n_steps=25, parallel=True, cores=16, progressbar=True, random_seed=seed
     )
 
 duration = time.time() - start_time

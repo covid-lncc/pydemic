@@ -44,7 +44,7 @@ import pandas as pd  # data processing, CSV file I/O (e.g. pd.read_csv)
 import pymc3 as pm  # for uncertainty quantification and model calibration
 import theano  # to control better pymc3 backend and write a wrapper
 import theano.tensor as t  # for the wrapper to a custom model to pymc3
-from numba import jit  # to accelerate ODE system RHS evaluations
+from numba import jit, vectorize, float64  # to accelerate ODE system RHS evaluations
 from scipy import optimize  # to solve minimization problem from least-squares fitting
 from scipy.integrate import solve_ivp  # to solve ODE system
 from tqdm import tqdm, trange
@@ -58,7 +58,8 @@ THEANO_FLAGS = "optimizer=fast_compile"  # A theano trick
 
 Numba.enable_numba()  # speed-up arviz plots
 
-DATA_PATH = os.environ["DATA_DIR"]
+# DATA_PATH = os.environ["DATA_DIR"]
+DATA_PATH = "../pydemic/data/"
 
 # %% [markdown]
 # <a id="loading"></a>
@@ -72,7 +73,7 @@ sp_state_population = 44.04e6
 rj_state_population = 16.46e6
 ce_state_population = 8.843e6
 
-target_population = brazil_population
+target_population = rj_state_population
 target_population
 
 # %%
@@ -87,7 +88,7 @@ df_brazil_states_cases = df_brazil_states_cases[df_brazil_states_cases.state != 
 
 # %%
 def get_brazil_state_dataframe(
-    df_brazil: pd.DataFrame, state_name: str, confirmed_lower_threshold: int = 10
+    df_brazil: pd.DataFrame, state_name: str, confirmed_lower_threshold: int = 5
 ) -> pd.DataFrame:
     df_brazil = df_brazil.copy()
     df_state_cases = df_brazil[df_brazil.state == state_name]
@@ -128,13 +129,13 @@ rio_columns_rename = {"cases": "confirmed", "recoveries": "recovered"}
 df_rio_cases_by_day.rename(columns=rio_columns_rename, inplace=True)
 
 # %%
-df_target_country = df_brazil_cases_by_day
+df_target_country = df_rj_state_cases
 
 E0, A0, I0, P0, R0, D0, C0, H0 = (
     int(10 * float(df_target_country.confirmed.values[0])),
     int(1 * float(df_target_country.confirmed.values[0])),
     int(5 * float(df_target_country.confirmed.values[0])),
-    int(float(df_target_country.active.values[0])),
+    int(float(df_target_country.confirmed.values[0])),
     int(float(df_target_country.recovered.values[0])),
     int(float(df_target_country.deaths.values[0])),
     int(float(df_target_country.confirmed.values[0])),
@@ -150,6 +151,13 @@ y0_seirpdq = S0, E0, A0, I0, P0, R0, D0, C0, H0  # SEIRPDQ IC array (not fully u
 # ## Programming SEIRPD-Q model in Python
 
 # %%
+def _omega_t(t, omega_value, decay_constant):
+    return omega_value if t < 100 else omega_value * np.exp(-decay_constant * t)
+
+
+omega_t = np.vectorize(_omega_t)
+
+
 @jit(nopython=True)
 def seirpdq_model(
     t,
@@ -176,6 +184,7 @@ def seirpdq_model(
     S, E, A, I, P, R, D, C, H = X
     beta = beta0  # * np.exp(-beta1 * t)
     mu = mu0  # * np.exp(-mu1 * t)
+    omega = omega_t(t, omega, decay_constant=0.001)
     S_prime = -beta / N * S * I - mu / N * S * A - omega * S + eta * R
     E_prime = beta / N * S * I + mu / N * S * A - sigma * E - omega * E
     A_prime = sigma * (1 - rho) * E - gamma_A * A - omega * A
@@ -198,16 +207,16 @@ def seirpdq_ode_solver(
     t_eval,
     beta0=1e-7,
     omega=1 / 10,
-    gamma_P=1 / 14,
-    d_I=2e-4,
-    d_P=9e-3,
     # gamma_P=1 / 14,
+    d_P=9e-3,
+    d_I=2e-4,
+    gamma_P=1 / 14,
     mu0=1e-7,
     gamma_I=1 / 14,
     gamma_A=1 / 14,
     epsilon_I=1 / 3,
-    rho=0.9,
-    sigma=1 / 4,
+    rho=0.85,
+    sigma=1 / 5,
     eta=0,
     beta1=0,
     mu1=0,
@@ -394,9 +403,9 @@ recovered_cases = df_target_country.recovered.values
 bounds_seirpdq = [
     (0, 1e-5),  # beta
     (0, 1),  # omega
-    (1 / 21, 1 / 10),  # gamma_P
-    # (0.1, 1e-5),  # d_I
-    # (0.1, 1e-5),  # d_P
+    # (1 / 21, 1 / 10),  # gamma_P
+    (1e-5, 0.1),  # d_P
+    (0, 0.1),  # d_I
     # (1 / 21, 1 / 14),  # gamma_P
 ]
 # bounds_seirdaq = [(0, 1e-2), (0, 1), (0, 1), (0, 0.2), (0, 0.2), (0, 0.2)]
@@ -413,7 +422,7 @@ result_seirpdq = optimize.differential_evolution(
     ),
     popsize=20,
     strategy="best1bin",
-    tol=5e-5,
+    tol=1e-5,
     recombination=0.95,
     mutation=0.6,
     maxiter=10000,
@@ -421,7 +430,7 @@ result_seirpdq = optimize.differential_evolution(
     disp=True,
     seed=seed,
     callback=callback_de,
-    workers=16,
+    workers=-1,
 )
 
 print(result_seirpdq)
@@ -434,19 +443,19 @@ print(f"-- Initial conditions: {y0_seirpdq}")
     beta_deterministic,
     omega_deterministic,
     # gamma_P_deterministic,
-    # d_I_deterministic,
-    # d_P_deterministic,
-    gamma_P_deterministic,
+    d_P_deterministic,
+    d_I_deterministic,
+    # gamma_P_deterministic,
 ) = result_seirpdq.x
 
 gamma_I_deterministic = 1 / 14
 gamma_A_deterministic = 1 / 14
-# gamma_P_deterministic = 1 / 14
-d_I_deterministic = 2e-4
-d_P_deterministic = 9e-3
+gamma_P_deterministic = 1 / 14
+# d_I_deterministic = 2e-4
+# d_P_deterministic = 9e-3
 epsilon_I_deterministic = 1 / 3
-rho_deterministic = 0.9
-sigma_deterministic = 1 / 4
+rho_deterministic = 0.85
+sigma_deterministic = 1 / 5
 eta_deterministic = 0
 
 # %%
@@ -493,17 +502,17 @@ t_computed_seirpdq, y_computed_seirpdq = solution_ODE_seirpdq.t, solution_ODE_se
 # %%
 parameters_dict = {
     "Model": "SEAIRPD-Q",
-    r"$beta$": beta_deterministic,
-    r"$mu$": beta_deterministic,
-    r"$gamma_I$": gamma_I_deterministic,
-    r"$gamma_A$": gamma_A_deterministic,
-    r"$gamma_P$": gamma_P_deterministic,
-    r"$d_I$": d_I_deterministic,
-    r"$d_P$": d_P_deterministic,
-    r"$epsilon_I$": epsilon_I_deterministic,
-    r"$rho$": rho_deterministic,
-    r"$omega$": omega_deterministic,
-    r"$sigma$": sigma_deterministic,
+    u"$beta$": beta_deterministic,
+    u"$mu$": beta_deterministic,
+    u"$gamma_I$": gamma_I_deterministic,
+    u"$gamma_A$": gamma_A_deterministic,
+    u"$gamma_P$": gamma_P_deterministic,
+    u"$d_I$": d_I_deterministic,
+    u"$d_P$": d_P_deterministic,
+    u"$epsilon_I$": epsilon_I_deterministic,
+    u"$rho$": rho_deterministic,
+    u"$omega$": omega_deterministic,
+    u"$sigma$": sigma_deterministic,
 }
 
 df_parameters_calibrated = pd.DataFrame.from_records([parameters_dict])
@@ -607,9 +616,9 @@ plt.plot(
     data_time, dead_individuals, label="Recorded deaths", marker="v", linestyle="", markersize=10
 )
 
-plt.plot(
+""" plt.plot(
     data_time, recovered_cases, label="Recorded recoveries", marker="v", linestyle="", markersize=10
-)
+) """
 
 plt.xlabel("Time (days)")
 plt.ylabel("Population")
@@ -655,7 +664,7 @@ print(df_deaths_estimates.to_latex(index=False))
 
 # %%
 t0 = float(data_time.min())
-number_of_days_after_last_record = 120
+number_of_days_after_last_record = 180
 tf = data_time.max() + number_of_days_after_last_record
 time_range = np.linspace(t0, tf, int(tf - t0) + 1)
 
@@ -678,6 +687,19 @@ t_computed_predict_seirpdq, y_computed_predict_seirpdq = (
     C_predict_seirpdq,
     H_predict_seirpdq,
 ) = y_computed_predict_seirpdq
+
+Rt_predict = calculate_reproduction_number(
+    S_predict_seirpdq,
+    beta_deterministic,
+    beta_deterministic,
+    gamma_I_deterministic,
+    gamma_A_deterministic,
+    d_I_deterministic,
+    epsilon_I_deterministic,
+    rho_deterministic,
+    omega_deterministic,
+    sigma_deterministic,
+)
 
 # %% [markdown]
 # Calculating the day when the number of infected individuals is max:
@@ -731,9 +753,9 @@ if has_to_plot_infection_peak:
         x=crisis_day_seirpdq, color="red", linestyle="-", label="Diagnosed peak (SEAIRPD-Q)"
     )
 
-plt.plot(
+""" plt.plot(
     data_time, infected_individuals, label="Diagnosed data", marker="s", linestyle="", markersize=10
-)
+) """
 plt.plot(
     data_time, dead_individuals, label="Recorded deaths", marker="v", linestyle="", markersize=10
 )
@@ -785,9 +807,9 @@ plt.plot(
     data_time, dead_individuals, label="Recorded deaths", marker="v", linestyle="", markersize=10
 )
 
-plt.plot(
+""" plt.plot(
     data_time, recovered_cases, label="Recorded recoveries", marker="v", linestyle="", markersize=10
-)
+) """
 
 plt.xlabel("Time (days)")
 plt.ylabel("Population")
@@ -814,462 +836,17 @@ print(
 print(f"-- Number of death estimate (SEIRPD-Q model):\t {int(D_predict_seirpdq[-1])}")
 print(f"-- Reproduction number (R0):\t {reproduction_number:.3f}")
 
-
-# %% [markdown]
-# <a id="bayes-calibration"></a>
-# ## Bayesian Calibration
-
-# %%
-observations_to_fit = np.vstack([dead_individuals, confirmed_cases]).T
-
-
-# %%
-@theano.compile.ops.as_op(
-    itypes=[t.dvector, t.dvector, t.dscalar, t.dscalar, t.dscalar, t.dscalar], otypes=[t.dmatrix]
-)
-def seirpdq_ode_wrapper(time_exp, initial_conditions, beta, gamma, delta, theta):
-    time_span = (time_exp.min(), time_exp.max())
-
-    args = [beta, gamma, delta, theta]
-    y_model = seirpdq_ode_solver(initial_conditions, time_span, time_exp, *args)
-    simulated_time = y_model.t
-    simulated_ode_solution = y_model.y
-    (_, _, _, _, _, _, simulated_qoi1, simulated_qoi2, _,) = simulated_ode_solution
-
-    concatenate_simulated_qoi = np.vstack([simulated_qoi1, simulated_qoi2])
-
-    return concatenate_simulated_qoi
-
-
-@theano.compile.ops.as_op(
-    itypes=[
-        t.dvector,
-        t.dvector,
-        t.dscalar,
-        t.dscalar,  # beta
-        t.dscalar,  # omega
-        t.dscalar,  # gamma_P
-        # t.dscalar,  # d_I
-        # t.dscalar,  # d_P
-        # t.dscalar,  # gamma_P
-    ],
-    otypes=[t.dmatrix],
-)
-def seirpdq_ode_wrapper_with_y0(
-    time_exp, initial_conditions, total_population, beta, omega, gamma_P
-):
-    time_span = (time_exp.min(), time_exp.max())
-
-    # args = [beta, omega, d_I, d_P]
-    args = [beta, omega, gamma_P]
-    y_model = seirpdq_ode_solver(initial_conditions, time_span, time_exp, *args)
-    simulated_time = y_model.t
-    simulated_ode_solution = y_model.y
-    (_, _, _, _, _, _, simulated_qoi1, simulated_qoi2, _,) = simulated_ode_solution
-
-    concatenate_simulated_qoi = np.vstack([simulated_qoi1, simulated_qoi2]).T
-
-    return concatenate_simulated_qoi
-
-
-# %%
-print("\n*** Performing Bayesian calibration ***")
-
-print("-- Running Monte Carlo simulations:")
-draws = 2500
-start_time = time.time()
-percent_calibration = 0.95
-with pm.Model() as model_mcmc:
-    # Prior distributions for the model's parameters
-    beta = pm.Uniform("beta", lower=0, upper=1e-5,)
-    omega = pm.Uniform("omega", lower=0, upper=1,)
-    gamma_P = pm.Uniform(
-        "gamma_P", 
-        lower=(1 - percent_calibration) * gamma_P_deterministic, 
-        upper=(1 + percent_calibration) * gamma_P_deterministic,
-        )
-    # d_I = pm.Uniform("d_I", lower=1e-5, upper=0.1,)
-    # d_P = pm.Uniform("d_P", lower=1e-5, upper=0.1,)
-
-    standard_deviation = pm.Uniform("std_deviation", lower=1e0, upper=1e4, shape=2)
-
-    # Defining the deterministic formulation of the problem
-    fitting_model = pm.Deterministic(
-        "seirpdq_model",
-        seirpdq_ode_wrapper_with_y0(
-            theano.shared(data_time),
-            theano.shared(np.array(y0_seirpdq)),
-            theano.shared(target_population),
-            beta,
-            omega,
-            gamma_P,
-            # d_I,
-            # d_P
-        ),
-    )
-
-    R0_realizations = pm.Deterministic(
-        "R0",
-        calculate_reproduction_number(
-            S0,
-            beta,
-            beta,
-            gamma_I_deterministic,
-            gamma_A_deterministic,
-            d_I_deterministic,
-            # d_I,
-            epsilon_I_deterministic,
-            rho_deterministic,
-            omega,
-            sigma_deterministic,
-        ),
-    )
-
-    likelihood_model = pm.Normal(
-        "likelihood_model", mu=fitting_model, sigma=standard_deviation, observed=observations_to_fit
-    )
-
-    seirdpq_trace_calibration = pm.sample_smc(
-        draws=draws, n_steps=25, parallel=True, cores=4, progressbar=True, random_seed=seed
-    )
-
-duration = time.time() - start_time
-
-print(f"-- Monte Carlo simulations done in {duration / 60:.3f} minutes")
-
-# %%
-print("-- Arviz post-processing:")
-import warnings
-
-warnings.filterwarnings("ignore")
-
-start_time = time.time()
-plot_step = 1
-
-
-# %%
-calibration_variable_names = [
-    "std_deviation",
-    "beta",
-    "gamma_P",
-    "omega",
-    # "d_I",
-    # "d_P",
-    "R0",
-]
-
-progress_bar = tqdm(calibration_variable_names)
-for variable in progress_bar:
-    progress_bar.set_description("Arviz post-processing")
-    pm.traceplot(seirdpq_trace_calibration[::plot_step], var_names=(f"{variable}"))
-    plt.savefig(f"seirpdq_{variable}_traceplot_cal.png")
-
-    pm.plot_posterior(
-        seirdpq_trace_calibration[::plot_step], 
-        var_names=(f"{variable}"), 
-        kind="hist", 
-        round_to=5,
-        point_estimate="mode"
-    )
-    plt.savefig(f"seirpdq_{variable}_posterior_cal.png")
-
-az.plot_pair(
-    seirdpq_trace_calibration,
-    var_names=calibration_variable_names[1:],
-    kind="hexbin",
-    fill_last=False,
-    figsize=(10, 8),
-)
-plt.savefig("seirpdq_marginals_cal.png")
-
-# %%
-percentile_cut = 2.5
-
-y_min = np.percentile(seirdpq_trace_calibration["seirpdq_model"], percentile_cut, axis=0)
-y_max = np.percentile(seirdpq_trace_calibration["seirpdq_model"], 100 - percentile_cut, axis=0)
-y_fit = np.percentile(seirdpq_trace_calibration["seirpdq_model"], 50, axis=0)
-
-
-# %%
-std_deviation = seirdpq_trace_calibration.get_values("std_deviation")
-sd_pop = np.sqrt(std_deviation.mean())
-print(f"-- Estimated standard deviation mean: {sd_pop}")
-
-
 # %%
 plt.figure(figsize=(9, 7))
 
 plt.plot(
-    data_time,
-    y_fit[:, 0],
-    "r",
-    label="Deaths (SEAIRPD-Q)",
-    marker="D",
-    linestyle="-",
-    markersize=10,
-)
-plt.fill_between(data_time, y_min[:, 0], y_max[:, 0], color="r", alpha=0.2)
-
-plt.plot(
-    data_time, y_fit[:, 1], "b", label="Cases (SEAIRPD-Q)", marker="v", linestyle="-", markersize=10
-)
-plt.fill_between(data_time, y_min[:, 1], y_max[:, 1], color="b", alpha=0.2)
-
-# plt.errorbar(data_time, infected_individuals, yerr=sd_pop, label='Recorded diagnosed', linestyle='None', marker='s', markersize=10)
-# plt.errorbar(data_time, dead_individuals, yerr=sd_pop, label='Recorded deaths', marker='v', linestyle="None", markersize=10)
-plt.plot(
-    data_time, confirmed_cases, label="Confirmed data", marker="s", linestyle="", markersize=10
-)
-plt.plot(
-    data_time, dead_individuals, label="Recorded deaths", marker="v", linestyle="", markersize=10
-)
-
-plt.xlabel("Time (days)")
-plt.ylabel("Population")
-plt.legend()
-plt.grid()
-
-plt.tight_layout()
-
-plt.savefig("seirpdq_calibration_bayes.png")
-# # plt.show()
-
-# %%
-duration = time.time() - start_time
-
-print(f"-- Arviz post-processing done in {duration / 60:.3f} minutes")
-# %% [markdown]
-# Now we evaluate prediction. We have to retrieve parameter realizations.
-
-# %%
-print("\n*** Performing Bayesian prediction ***")
-print("-- Exporting calibrated parameter to CSV")
-
-start_time = time.time()
-
-dict_realizations = dict()
-progress_bar = tqdm(calibration_variable_names[1:])
-for variable in progress_bar:
-    progress_bar.set_description(f"Gathering {variable} realizations")
-    parameter_realization = seirdpq_trace_calibration.get_values(f"{variable}")
-    dict_realizations[f"{variable}"] = parameter_realization
-
-df_realizations = pd.DataFrame(dict_realizations)
-df_realizations.to_csv("calibration_realizations.csv")
-
-duration = time.time() - start_time
-
-print(f"-- Exported done in {duration:.3f} seconds")
-
-print("-- Processing Bayesian predictions")
-
-S_predicted = list()
-E_predicted = list()
-A_predicted = list()
-I_predicted = list()
-P_predicted = list()
-R_predicted = list()
-D_predicted = list()
-C_predicted = list()
-H_predicted = list()
-Rt_predicted = list()
-number_of_total_realizations = len(dict_realizations["beta"])
-for realization in trange(number_of_total_realizations):
-    parameters_realization = [
-        dict_realizations["beta"][realization],
-        dict_realizations["omega"][realization],
-        dict_realizations["gamma_P"][realization],
-        # dict_realizations["d_I"][realization],
-        # dict_realizations["d_P"][realization],
-    ]
-    solution_ODE_predict = seirpdq_ode_solver(
-        y0_seirpdq, (t0, tf), time_range, *parameters_realization
-    )
-    t_computed_predict, y_computed_predict = solution_ODE_predict.t, solution_ODE_predict.y
-    S, E, A, I, P, R, D, C, H = y_computed_predict
-
-    reproduction_number_t = calculate_reproduction_number(
-        S,
-        dict_realizations["beta"][realization],
-        dict_realizations["beta"][realization],
-        gamma_I_deterministic,
-        gamma_A_deterministic,
-        d_I_deterministic,
-        epsilon_I_deterministic,
-        rho_deterministic,
-        dict_realizations["omega"][realization],
-        sigma_deterministic,
-    )
-
-    S_predicted.append(S)
-    E_predicted.append(E)
-    A_predicted.append(A)
-    I_predicted.append(I)
-    P_predicted.append(P)
-    R_predicted.append(R)
-    D_predicted.append(D)
-    C_predicted.append(C)
-    H_predicted.append(H)
-    Rt_predicted.append(reproduction_number_t)
-
-S_predicted = np.array(S_predicted)
-E_predicted = np.array(E_predicted)
-A_predicted = np.array(A_predicted)
-I_predicted = np.array(I_predicted)
-P_predicted = np.array(P_predicted)
-R_predicted = np.array(R_predicted)
-D_predicted = np.array(D_predicted)
-C_predicted = np.array(C_predicted)
-H_predicted = np.array(H_predicted)
-Rt_predicted = np.array(Rt_predicted)
-
-percentile_cut = 2.5
-C_min = np.percentile(C_predicted, percentile_cut, axis=0)
-C_max = np.percentile(C_predicted, 100 - percentile_cut, axis=0)
-C_mean = np.percentile(C_predicted, 50, axis=0)
-
-P_min = np.percentile(P_predicted, percentile_cut, axis=0)
-P_max = np.percentile(P_predicted, 100 - percentile_cut, axis=0)
-P_mean = np.percentile(P_predicted, 50, axis=0)
-
-I_min = np.percentile(I_predicted, percentile_cut, axis=0)
-I_max = np.percentile(I_predicted, 100 - percentile_cut, axis=0)
-I_mean = np.percentile(I_predicted, 50, axis=0)
-
-A_min = np.percentile(A_predicted, percentile_cut, axis=0)
-A_max = np.percentile(A_predicted, 100 - percentile_cut, axis=0)
-A_mean = np.percentile(A_predicted, 50, axis=0)
-
-D_min = np.percentile(D_predicted, percentile_cut, axis=0)
-D_max = np.percentile(D_predicted, 100 - percentile_cut, axis=0)
-D_mean = np.percentile(D_predicted, 50, axis=0)
-
-Rt_min = np.percentile(Rt_predicted, percentile_cut, axis=0)
-Rt_max = np.percentile(Rt_predicted, 100 - percentile_cut, axis=0)
-Rt_mean = np.percentile(Rt_predicted, 50, axis=0)
-
-# %%
-plt.figure(figsize=(9, 7))
-
-plt.plot(
-    t_computed_predict,
-    C_mean,
-    "b",
-    label="Cases (SEAIRPD-Q)",
-    marker="D",
-    linestyle="-",
-    markersize=10,
-)
-plt.fill_between(t_computed_predict, C_min, C_max, color="b", alpha=0.2)
-
-plt.plot(
-    t_computed_predict,
-    D_mean,
-    "r",
-    label="Deaths (SEAIRPD-Q)",
-    marker="v",
-    linestyle="-",
-    markersize=10,
-)
-plt.fill_between(t_computed_predict, D_min, D_max, color="r", alpha=0.2)
-
-# plt.errorbar(data_time, infected_individuals, yerr=sd_pop, label='Recorded diagnosed', linestyle='None', marker='s', markersize=10)
-# plt.errorbar(data_time, dead_individuals, yerr=sd_pop, label='Recorded deaths', marker='v', linestyle="None", markersize=10)
-plt.plot(
-    data_time, confirmed_cases, label="Confirmed data", marker="s", linestyle="", markersize=10
-)
-plt.plot(
-    data_time, dead_individuals, label="Recorded deaths", marker="v", linestyle="", markersize=10
-)
-
-plt.xlabel("Time (days)")
-plt.ylabel("Population")
-plt.legend()
-plt.grid()
-
-plt.tight_layout()
-
-plt.savefig("seirpdq_prediction_cumulative_bayes.png")
-# plt.show()
-
-# %%
-plt.figure(figsize=(9, 7))
-
-plt.plot(
-    t_computed_predict,
-    P_mean,
-    "b",
-    label="Diagnosed (SEAIRPD-Q)",
-    marker="D",
-    linestyle="-",
-    markersize=10,
-)
-plt.fill_between(t_computed_predict, P_min, P_max, color="b", alpha=0.2)
-
-plt.plot(
-    t_computed_predict,
-    I_mean,
-    "g",
-    label="Infected (SEAIRPD-Q)",
-    marker="X",
-    linestyle="-",
-    markersize=10,
-)
-plt.fill_between(t_computed_predict, I_min, I_max, color="g", alpha=0.2)
-
-plt.plot(
-    t_computed_predict,
-    A_mean,
-    "m",
-    label="Asymptomatic (SEAIRPD-Q)",
-    marker="o",
-    linestyle="-",
-    markersize=10,
-)
-plt.fill_between(t_computed_predict, A_min, A_max, color="m", alpha=0.2)
-
-plt.plot(
-    t_computed_predict,
-    D_mean,
-    "r",
-    label="Deaths (SEAIRPD-Q)",
-    marker="v",
-    linestyle="-",
-    markersize=10,
-)
-plt.fill_between(t_computed_predict, D_min, D_max, color="r", alpha=0.2)
-
-# plt.errorbar(data_time, infected_individuals, yerr=sd_pop, label='Recorded diagnosed', linestyle='None', marker='s', markersize=10)
-# plt.errorbar(data_time, dead_individuals, yerr=sd_pop, label='Recorded deaths', marker='v', linestyle="None", markersize=10)
-plt.plot(
-    data_time, infected_individuals, label="Active cases", marker="s", linestyle="", markersize=10
-)
-plt.plot(
-    data_time, dead_individuals, label="Recorded deaths", marker="v", linestyle="", markersize=10
-)
-
-plt.xlabel("Time (days)")
-plt.ylabel("Population")
-plt.legend()
-plt.grid()
-
-plt.tight_layout()
-
-plt.savefig("seirpdq_prediction_bayes.png")
-# plt.show()
-
-# %%
-plt.figure(figsize=(9, 7))
-
-plt.plot(
-    t_computed_predict,
-    Rt_mean,
+    t_computed_predict_seirpdq,
+    Rt_predict,
     "r",
     marker="X",
     linestyle="-",
-    markersize=3,
+    markersize=5,
 )
-plt.fill_between(t_computed_predict, Rt_min, Rt_max, color="r", alpha=0.2)
 
 plt.xlabel("Time (days)")
 plt.ylabel(r"$R(t)$")
@@ -1277,4 +854,27 @@ plt.grid()
 
 plt.tight_layout()
 
-plt.savefig("Rt_prediction_bayes.png")
+plt.savefig("Rt_prediction.png")
+
+# %%
+# Omega evaluation
+# omega_values = omega_t(t_computed_predict_seirpdq, omega_deterministic)
+
+# plt.figure(figsize=(9, 7))
+
+# plt.plot(
+#     t_computed_predict_seirpdq,
+#     omega_values,
+#     "b",
+#     marker="o",
+#     linestyle="-",
+#     markersize=5,
+# )
+
+# plt.xlabel("Time (days)")
+# plt.ylabel(r"$\omega(t)$")
+# plt.grid()
+
+# plt.tight_layout()
+
+# plt.savefig("omega_prediction.png")

@@ -58,7 +58,8 @@ THEANO_FLAGS = "optimizer=fast_compile"  # A theano trick
 
 Numba.enable_numba()  # speed-up arviz plots
 
-DATA_PATH = os.environ["DATA_DIR"]
+# DATA_PATH = os.environ["DATA_DIR"]
+DATA_PATH = "../pydemic/data/"
 
 # %% [markdown]
 # <a id="loading"></a>
@@ -87,7 +88,7 @@ df_brazil_states_cases = df_brazil_states_cases[df_brazil_states_cases.state != 
 
 # %%
 def get_brazil_state_dataframe(
-    df_brazil: pd.DataFrame, state_name: str, confirmed_lower_threshold: int = 10
+    df_brazil: pd.DataFrame, state_name: str, confirmed_lower_threshold: int = 5
 ) -> pd.DataFrame:
     df_brazil = df_brazil.copy()
     df_state_cases = df_brazil[df_brazil.state == state_name]
@@ -134,7 +135,7 @@ E0, A0, I0, P0, R0, D0, C0, H0 = (
     int(10 * float(df_target_country.confirmed.values[0])),
     int(1 * float(df_target_country.confirmed.values[0])),
     int(5 * float(df_target_country.confirmed.values[0])),
-    int(float(df_target_country.active.values[0])),
+    int(float(df_target_country.confirmed.values[0])),
     int(float(df_target_country.recovered.values[0])),
     int(float(df_target_country.deaths.values[0])),
     int(float(df_target_country.confirmed.values[0])),
@@ -206,8 +207,8 @@ def seirpdq_ode_solver(
     gamma_I=1 / 14,
     gamma_A=1 / 14,
     epsilon_I=1 / 3,
-    rho=0.9,
-    sigma=1 / 4,
+    rho=0.85,
+    sigma=1 / 5,
     eta=0,
     beta1=0,
     mu1=0,
@@ -413,7 +414,7 @@ result_seirpdq = optimize.differential_evolution(
     ),
     popsize=20,
     strategy="best1bin",
-    tol=5e-5,
+    tol=1e-5,
     recombination=0.95,
     mutation=0.6,
     maxiter=10000,
@@ -421,7 +422,7 @@ result_seirpdq = optimize.differential_evolution(
     disp=True,
     seed=seed,
     callback=callback_de,
-    workers=16,
+    workers=-1,
 )
 
 print(result_seirpdq)
@@ -445,8 +446,8 @@ gamma_A_deterministic = 1 / 14
 d_I_deterministic = 2e-4
 d_P_deterministic = 9e-3
 epsilon_I_deterministic = 1 / 3
-rho_deterministic = 0.9
-sigma_deterministic = 1 / 4
+rho_deterministic = 0.85
+sigma_deterministic = 1 / 5
 eta_deterministic = 0
 
 # %%
@@ -493,17 +494,17 @@ t_computed_seirpdq, y_computed_seirpdq = solution_ODE_seirpdq.t, solution_ODE_se
 # %%
 parameters_dict = {
     "Model": "SEAIRPD-Q",
-    r"$beta$": beta_deterministic,
-    r"$mu$": beta_deterministic,
-    r"$gamma_I$": gamma_I_deterministic,
-    r"$gamma_A$": gamma_A_deterministic,
-    r"$gamma_P$": gamma_P_deterministic,
-    r"$d_I$": d_I_deterministic,
-    r"$d_P$": d_P_deterministic,
-    r"$epsilon_I$": epsilon_I_deterministic,
-    r"$rho$": rho_deterministic,
-    r"$omega$": omega_deterministic,
-    r"$sigma$": sigma_deterministic,
+    u"$beta$": beta_deterministic,
+    u"$mu$": beta_deterministic,
+    u"$gamma_I$": gamma_I_deterministic,
+    u"$gamma_A$": gamma_A_deterministic,
+    u"$gamma_P$": gamma_P_deterministic,
+    u"$d_I$": d_I_deterministic,
+    u"$d_P$": d_P_deterministic,
+    u"$epsilon_I$": epsilon_I_deterministic,
+    u"$rho$": rho_deterministic,
+    u"$omega$": omega_deterministic,
+    u"$sigma$": sigma_deterministic,
 }
 
 df_parameters_calibrated = pd.DataFrame.from_records([parameters_dict])
@@ -607,9 +608,9 @@ plt.plot(
     data_time, dead_individuals, label="Recorded deaths", marker="v", linestyle="", markersize=10
 )
 
-plt.plot(
+""" plt.plot(
     data_time, recovered_cases, label="Recorded recoveries", marker="v", linestyle="", markersize=10
-)
+) """
 
 plt.xlabel("Time (days)")
 plt.ylabel("Population")
@@ -731,9 +732,9 @@ if has_to_plot_infection_peak:
         x=crisis_day_seirpdq, color="red", linestyle="-", label="Diagnosed peak (SEAIRPD-Q)"
     )
 
-plt.plot(
+""" plt.plot(
     data_time, infected_individuals, label="Diagnosed data", marker="s", linestyle="", markersize=10
-)
+) """
 plt.plot(
     data_time, dead_individuals, label="Recorded deaths", marker="v", linestyle="", markersize=10
 )
@@ -785,9 +786,9 @@ plt.plot(
     data_time, dead_individuals, label="Recorded deaths", marker="v", linestyle="", markersize=10
 )
 
-plt.plot(
+""" plt.plot(
     data_time, recovered_cases, label="Recorded recoveries", marker="v", linestyle="", markersize=10
-)
+) """
 
 plt.xlabel("Time (days)")
 plt.ylabel("Population")
@@ -881,13 +882,21 @@ start_time = time.time()
 percent_calibration = 0.95
 with pm.Model() as model_mcmc:
     # Prior distributions for the model's parameters
-    beta = pm.Uniform("beta", lower=0, upper=1e-5,)
-    omega = pm.Uniform("omega", lower=0, upper=1,)
+    beta = pm.Uniform(
+        "beta", 
+        lower=0, 
+        upper=1e-5,
+    )
+    omega = pm.Uniform(
+        "omega", 
+        lower=0, 
+        upper=1,
+    )
     gamma_P = pm.Uniform(
         "gamma_P", 
-        lower=(1 - percent_calibration) * gamma_P_deterministic, 
-        upper=(1 + percent_calibration) * gamma_P_deterministic,
-        )
+        lower=1 / 28, 
+        upper=1 / 14,
+    )
     # d_I = pm.Uniform("d_I", lower=1e-5, upper=0.1,)
     # d_P = pm.Uniform("d_P", lower=1e-5, upper=0.1,)
 
@@ -930,7 +939,7 @@ with pm.Model() as model_mcmc:
     )
 
     seirdpq_trace_calibration = pm.sample_smc(
-        draws=draws, n_steps=25, parallel=True, cores=4, progressbar=True, random_seed=seed
+        draws=draws, n_steps=25, parallel=True, cores=16, progressbar=True, random_seed=seed
     )
 
 duration = time.time() - start_time
@@ -1241,9 +1250,9 @@ plt.fill_between(t_computed_predict, D_min, D_max, color="r", alpha=0.2)
 
 # plt.errorbar(data_time, infected_individuals, yerr=sd_pop, label='Recorded diagnosed', linestyle='None', marker='s', markersize=10)
 # plt.errorbar(data_time, dead_individuals, yerr=sd_pop, label='Recorded deaths', marker='v', linestyle="None", markersize=10)
-plt.plot(
+""" plt.plot(
     data_time, infected_individuals, label="Active cases", marker="s", linestyle="", markersize=10
-)
+) """
 plt.plot(
     data_time, dead_individuals, label="Recorded deaths", marker="v", linestyle="", markersize=10
 )

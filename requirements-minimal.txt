@@ -1,0 +1,25 @@
+# Python
+attrs==19.3.0
+ipython==7.13.0
+numba==0.48.0
+invoke==1.4.1
+
+# Scientific stack
+numpy==1.18.2
+scipy==1.4.1
+pandas==1.0.3
+openpyxl==3.0.3
+pygmo>=2.11
+pymc3==3.8
+
+# Notebooks
+jupyter==1.0.0
+notebook==6.0.3
+nbextensions==0.1.0
+jupytext==1.4.1
+
+# Plotting
+matplotlib==3.2.1
+
+# Progress bar
+tqdm==4.44.0

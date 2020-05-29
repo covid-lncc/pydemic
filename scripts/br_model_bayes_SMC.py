@@ -940,7 +940,7 @@ with pm.Model() as model_mcmc:
     )
 
     seirdpq_trace_calibration = pm.sample_smc(
-        draws=draws, n_steps=25, parallel=True, cores=16, progressbar=True, random_seed=seed
+        draws=draws, n_steps=25, parallel=True, cores=int(os.cpu_count()), progressbar=True, random_seed=seed
     )
 
 duration = time.time() - start_time

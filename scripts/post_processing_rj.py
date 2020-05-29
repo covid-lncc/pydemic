@@ -42,7 +42,8 @@ Numba.enable_numba()
 
 #Paths
 DATA_PATH = '../pydemic/data'
-OUTPUT_PATH = './figures_c3_final_anna_rj/'
+OUTPUT_PATH = './output_post_processing/'
+os.makedirs(OUTPUT_PATH, exist_ok=True)
 
 # Matplotlib
 ALPHA = 0.2
@@ -129,13 +130,6 @@ df_target_country.tail(10)
 
 # %% [markdown]
 # ## <span style="color:red">Realization Path: Modify!</span>
-
-# %%
-# Parameter Realizations (BR)
-#case_dir = 'FINAL_C3_BR_WIDE_DIDP'
-
-# Parameter Realizations (RJ)
-case_dir = "FINAL_C3_RJ_WIDE_DIDP"
 
 # %% [markdown]
 # ## Initial Conditions
@@ -293,7 +287,7 @@ def seirpdq_ode_solver(
 
 # %%
 # Base File
-path_to_realizations = f'../{case_dir}/calibration_realizations.csv'
+path_to_realizations = f'./calibration_realizations.csv'
 parameters_realizations = pd.read_csv(path_to_realizations)
 parameters_realizations.head(10)
 

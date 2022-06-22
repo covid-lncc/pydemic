@@ -6,7 +6,7 @@ numba==0.48.0
 invoke==1.4.1
 
 # Scientific stack
-numpy==1.18.2
+numpy==1.22.0
 scipy==1.4.1
 pandas==1.0.3
 openpyxl==3.0.3
